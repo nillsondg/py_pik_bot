@@ -1,5 +1,4 @@
 {
-  "start": "Hi %s, first of all, select your language :)",
   "state1": {
     "next": [
       "state2",
