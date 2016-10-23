@@ -7,6 +7,8 @@ import pymongo
 import telebot
 from telebot import types
 
+from filter import *
+
 from api_token import TOKEN
 
 bot = telebot.TeleBot(TOKEN)
@@ -23,12 +25,19 @@ STATE_2 = "state2"
 STATE_3 = "state3"
 STATE_SELECTOR = "selector"
 user_state = dict()
+user_filter = dict()
 
 
 def get_current_state(uid):
     if uid not in user_state:
         user_state[uid] = 0
     return user_state[uid]
+
+
+def get_current_filter(uid):
+    if uid not in user_filter:
+        user_filter[uid] = Filter()
+    return user_filter[uid]
 
 
 @bot.message_handler(commands=['help'])
@@ -100,6 +109,9 @@ def selector(msg):
 @bot.message_handler(commands=[STATE_1])
 def proc1(msg):
     bot.reply_to(msg, "proc 1", reply_markup=types.ReplyKeyboardHide())
+    cur_filter = get_current_filter(msg.chat.id)
+    cur_filter.set_time(Time.today)
+    cur_filter.set_source(Source.pik)
     print_step_keyboard(msg, STATE_1)
 
 
@@ -107,6 +119,9 @@ def proc1(msg):
 @bot.message_handler(commands=[STATE_2])
 def proc2(msg):
     bot.reply_to(msg, "proc 2", reply_markup=types.ReplyKeyboardHide())
+    cur_filter = get_current_filter(msg.chat.id)
+    cur_filter.set_time(Time.today)
+    cur_filter.set_source(Source.morton)
     print_step_keyboard(msg, STATE_2)
 
 
@@ -114,6 +129,11 @@ def proc2(msg):
 @bot.message_handler(commands=[STATE_3])
 def proc3(msg):
     bot.reply_to(msg, "proc 3", reply_markup=types.ReplyKeyboardHide())
+    cur_filter = get_current_filter(msg.chat.id)
+    if cur_filter.is_clear():
+        cur_filter.set_time(Time.today)
+        cur_filter.set_source(Source.pik)
+    bot.send_message(msg.chat.id, str(cur_filter.time) + " " + str(cur_filter.source))
     print_step_keyboard(msg, STATE_3)
 
 
