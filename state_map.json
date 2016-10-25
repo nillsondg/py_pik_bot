@@ -1,18 +1,41 @@
 {
-  "state1": {
+  "sold_all_today": {
     "next": [
-      "state2",
-      "state3"
+      "sold_all_yesterday",
+      "sold_reg_today",
+      "sold_mos_today"
     ]
   },
-  "state2": {
+  "sold_all_yesterday": {
     "next": [
-      "state3"
+      "sold_reg_yesterday",
+      "sold_mos_yesterday"
     ]
   },
-  "state3": {
-    "next": []
+  "sold_reg_today": {
+    "next": [
+      "sold_reg_yesterday",
+      "sold_all_today",
+      "sold_mos_today"
+    ]
   },
-  "state4": {
+  "sold_reg_yesterday": {
+    "next": [
+      "sold_all_yesterday",
+      "sold_mos_yesterday"
+    ]
+  },
+  "sold_mos_today": {
+    "next": [
+      "sold_mos_yesterday",
+      "sold_reg_today",
+      "sold_all_today"
+    ]
+  },
+  "sold_mos_yesterday": {
+    "next": [
+      "sold_reg_yesterday",
+      "sold_all_yesterday"
+    ]
   }
 }

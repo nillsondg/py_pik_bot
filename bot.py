@@ -7,25 +7,32 @@ import pymongo
 import telebot
 from telebot import types
 
+import sql
+from config import TOKEN
 from filter import *
-
-from api_token import TOKEN
 
 bot = telebot.TeleBot(TOKEN)
 
 client = pymongo.MongoClient()
 db = client.users
 
-
 with open('state_map.json') as f:
     states = json.load(f, object_pairs_hook=OrderedDict)
 
-STATE_1 = "state1"
-STATE_2 = "state2"
-STATE_3 = "state3"
+# todo DRY -> state class needed
+CMD_SOLD = "sold"
+CMD_FORECAST = "forecast"
+STATE_SOLD_ALL_TODAY = "sold_all_today"
+STATE_SOLD_ALL_YESTERDAY = "sold_all_yesterday"
+STATE_SOLD_REG_TODAY = "sold_reg_today"
+STATE_SOLD_REG_YESTERDAY = "sold_reg_yesterday"
+STATE_SOLD_MOS_TODAY = "sold_mos_today"
+STATE_SOLD_MOS_YESTERDAY = "sold_mos_yesterday"
+
 STATE_SELECTOR = "selector"
 user_state = dict()
 user_filter = dict()
+sql_server = sql.SQL()
 
 
 def get_current_state(uid):
@@ -62,7 +69,7 @@ def check_auth(message):
         bot.reply_to(message, "Добро пожаловать")
         add_user_into_db(message.from_user)
     else:
-        bot.reply_to(message, "Неверно, попроуйте еще")
+        bot.reply_to(message, "Неверно, попробуйте еще")
         bot.register_next_step_handler(message, check_auth)
 
 
@@ -98,43 +105,78 @@ def cancel(msg):
 @bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) == STATE_SELECTOR)
 def selector(msg):
     if msg.text in states:
-        if msg.text == STATE_2:
-            proc2(msg)
-        if msg.text == STATE_3:
-            proc3(msg)
+        if msg.text == STATE_SOLD_ALL_TODAY:
+            sold_all_today(msg)
+        if msg.text == STATE_SOLD_ALL_YESTERDAY:
+            sold_all_yesterday(msg)
+        if msg.text == STATE_SOLD_REG_TODAY:
+            sold_reg_today(msg)
+        if msg.text == STATE_SOLD_REG_YESTERDAY:
+            sold_reg_yesterday(msg)
+        if msg.text == STATE_SOLD_MOS_TODAY:
+            sold_mos_today(msg)
+        if msg.text == STATE_SOLD_MOS_YESTERDAY:
+            sold_mos_yesterday(msg)
     user_state[msg.chat.id] = 0
 
 
-@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) == STATE_1)
-@bot.message_handler(commands=[STATE_1])
-def proc1(msg):
-    bot.reply_to(msg, "proc 1", reply_markup=types.ReplyKeyboardHide())
+@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) == STATE_SOLD_ALL_TODAY)
+@bot.message_handler(commands=[CMD_SOLD])
+def sold_all_today(msg):
     cur_filter = get_current_filter(msg.chat.id)
     cur_filter.set_time(Time.today)
     cur_filter.set_source(Source.pik)
-    print_step_keyboard(msg, STATE_1)
+    bot.reply_to(msg, sql_server.sales_all_today(), reply_markup=types.ReplyKeyboardHide())
+    print_step_keyboard(msg, STATE_SOLD_ALL_TODAY)
 
 
-@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) == STATE_2)
-@bot.message_handler(commands=[STATE_2])
-def proc2(msg):
-    bot.reply_to(msg, "proc 2", reply_markup=types.ReplyKeyboardHide())
+@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) == STATE_SOLD_ALL_YESTERDAY)
+def sold_all_yesterday(msg):
+    bot.reply_to(msg, STATE_SOLD_ALL_YESTERDAY, reply_markup=types.ReplyKeyboardHide())
     cur_filter = get_current_filter(msg.chat.id)
-    cur_filter.set_time(Time.today)
-    cur_filter.set_source(Source.morton)
-    print_step_keyboard(msg, STATE_2)
+    cur_filter.set_time(Time.yesterday)
+    cur_filter.set_source(Source.pik)
+    print_step_keyboard(msg, STATE_SOLD_ALL_YESTERDAY)
 
 
-@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) == STATE_3)
-@bot.message_handler(commands=[STATE_3])
-def proc3(msg):
-    bot.reply_to(msg, "proc 3", reply_markup=types.ReplyKeyboardHide())
+@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) == STATE_SOLD_REG_TODAY)
+def sold_reg_today(msg):
+    bot.reply_to(msg, STATE_SOLD_REG_TODAY, reply_markup=types.ReplyKeyboardHide())
     cur_filter = get_current_filter(msg.chat.id)
     if cur_filter.is_clear():
         cur_filter.set_time(Time.today)
-        cur_filter.set_source(Source.pik)
-    bot.send_message(msg.chat.id, str(cur_filter.time) + " " + str(cur_filter.source))
-    print_step_keyboard(msg, STATE_3)
+        cur_filter.set_source(Source.regions)
+    print_step_keyboard(msg, STATE_SOLD_REG_TODAY)
+
+
+@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) == STATE_SOLD_REG_YESTERDAY)
+def sold_reg_yesterday(msg):
+    bot.reply_to(msg, STATE_SOLD_REG_YESTERDAY, reply_markup=types.ReplyKeyboardHide())
+    cur_filter = get_current_filter(msg.chat.id)
+    if cur_filter.is_clear():
+        cur_filter.set_time(Time.yesterday)
+        cur_filter.set_source(Source.regions)
+    print_step_keyboard(msg, STATE_SOLD_REG_YESTERDAY)
+
+
+@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) == STATE_SOLD_MOS_TODAY)
+def sold_mos_today(msg):
+    bot.reply_to(msg, STATE_SOLD_MOS_TODAY, reply_markup=types.ReplyKeyboardHide())
+    cur_filter = get_current_filter(msg.chat.id)
+    if cur_filter.is_clear():
+        cur_filter.set_time(Time.today)
+        cur_filter.set_source(Source.moscow)
+    print_step_keyboard(msg, STATE_SOLD_MOS_TODAY)
+
+
+@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) == STATE_SOLD_MOS_YESTERDAY)
+def sold_mos_yesterday(msg):
+    bot.reply_to(msg, STATE_SOLD_MOS_YESTERDAY, reply_markup=types.ReplyKeyboardHide())
+    cur_filter = get_current_filter(msg.chat.id)
+    if cur_filter.is_clear():
+        cur_filter.set_time(Time.yesterday)
+        cur_filter.set_source(Source.moscow)
+    print_step_keyboard(msg, STATE_SOLD_MOS_YESTERDAY)
 
 
 def print_step_keyboard(msg, state):
