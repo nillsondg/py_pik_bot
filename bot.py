@@ -1,43 +1,31 @@
 import datetime
 import hashlib
-import json
-from collections import OrderedDict
 
 import pymongo
 import telebot
 from telebot import types
 
-from filter import *
-
+from states import *
 from api_token import TOKEN
 
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.AsyncTeleBot(TOKEN)
 
 client = pymongo.MongoClient()
 db = client.users
 
-
-with open('state_map.json') as f:
-    states = json.load(f, object_pairs_hook=OrderedDict)
-
-STATE_1 = "state1"
-STATE_2 = "state2"
-STATE_3 = "state3"
+SOLD_CMD = "sold"
+FORECAST_CMD = "forecast"
 STATE_SELECTOR = "selector"
+NEED_AUTH = "need_auth"
 user_state = dict()
-user_filter = dict()
 
 
 def get_current_state(uid):
     if uid not in user_state:
-        user_state[uid] = 0
+        user_state[uid] = State.none
+    if not check_user_id_in_db(uid):
+        return NEED_AUTH
     return user_state[uid]
-
-
-def get_current_filter(uid):
-    if uid not in user_filter:
-        user_filter[uid] = Filter()
-    return user_filter[uid]
 
 
 @bot.message_handler(commands=['help'])
@@ -46,11 +34,10 @@ def send_help(message):
 
 
 @bot.message_handler(commands=['start'])
-# @bot.message_handler(func=lambda m: not auth_needed)
 def send_welcome(message):
     markup = types.ReplyKeyboardHide(selective=False)
     bot.reply_to(message, "Привет!", reply_markup=markup)
-    if not check_user_in_db(message.from_user):
+    if not check_user_id_in_db(message.from_user.uid):
         bot.send_message(message.chat.id, "Введите кодовое слово")
         bot.register_next_step_handler(message, check_auth)
     else:
@@ -62,7 +49,7 @@ def check_auth(message):
         bot.reply_to(message, "Добро пожаловать")
         add_user_into_db(message.from_user)
     else:
-        bot.reply_to(message, "Неверно, попроуйте еще")
+        bot.reply_to(message, "Неверно, попробуйте еще")
         bot.register_next_step_handler(message, check_auth)
 
 
@@ -70,8 +57,8 @@ def check_code(code):
     return hashlib.md5(code.encode('utf-8')).hexdigest() == "bc250e0d83c37b0953ada14e7bbc1dfd"
 
 
-def check_user_in_db(user):
-    return db.users.find_one(str(user.id)) is not None
+def check_user_id_in_db(uid):
+    return db.users.find_one(str(uid)) is not None
 
 
 def add_user_into_db(user):
@@ -91,62 +78,49 @@ def update_user_auth(user):
 
 @bot.message_handler(commands=['cancel'])
 def cancel(msg):
-    user_state[msg.chat.id] = 0
+    user_state[msg.chat.id] = State.none
     bot.reply_to(msg, "Отменено", reply_markup=types.ReplyKeyboardHide())
 
 
-@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) == STATE_SELECTOR)
-def selector(msg):
-    if msg.text in states:
-        if msg.text == STATE_2:
-            proc2(msg)
-        if msg.text == STATE_3:
-            proc3(msg)
-    user_state[msg.chat.id] = 0
+@bot.message_handler(commands=[SOLD_CMD, FORECAST_CMD])
+def start_handler(msg):
+    current_state = get_current_state(msg.chat.id)
+    if current_state == State.none:
+        user_state[msg.chat.id] = State.pik_today
+    elif current_state == NEED_AUTH:
+        check_auth(msg)
+        return
+    state_handler(msg)
 
 
-@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) == STATE_1)
-@bot.message_handler(commands=[STATE_1])
-def proc1(msg):
+@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) != State.none)
+def state_handler(msg):
+    if get_current_state(msg.chat.id) == STATE_SELECTOR:
+        user_state[msg.chat.id] = State.get_state_by_description(msg.text)
+    # todo handle
     bot.reply_to(msg, "proc 1", reply_markup=types.ReplyKeyboardHide())
-    cur_filter = get_current_filter(msg.chat.id)
-    cur_filter.set_time(Time.today)
-    cur_filter.set_source(Source.pik)
-    print_step_keyboard(msg, STATE_1)
-
-
-@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) == STATE_2)
-@bot.message_handler(commands=[STATE_2])
-def proc2(msg):
-    bot.reply_to(msg, "proc 2", reply_markup=types.ReplyKeyboardHide())
-    cur_filter = get_current_filter(msg.chat.id)
-    cur_filter.set_time(Time.today)
-    cur_filter.set_source(Source.morton)
-    print_step_keyboard(msg, STATE_2)
-
-
-@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) == STATE_3)
-@bot.message_handler(commands=[STATE_3])
-def proc3(msg):
-    bot.reply_to(msg, "proc 3", reply_markup=types.ReplyKeyboardHide())
-    cur_filter = get_current_filter(msg.chat.id)
-    if cur_filter.is_clear():
-        cur_filter.set_time(Time.today)
-        cur_filter.set_source(Source.pik)
-    bot.send_message(msg.chat.id, str(cur_filter.time) + " " + str(cur_filter.source))
-    print_step_keyboard(msg, STATE_3)
+    print_step_keyboard(msg, user_state[msg.chat.id])
 
 
 def print_step_keyboard(msg, state):
     markup = types.ReplyKeyboardMarkup()
-    buttons = states[state]["next"]
-    if len(buttons) == 0:
-        user_state[msg.chat.id] = 0
+    next_states = StateTransitions.get_transition_for_state(state)
+    if len(next_states) == 0:
+        user_state[msg.chat.id] = State.none
         return
-    for button in buttons:
-        markup.add(types.KeyboardButton(button))
+    for next_state in next_states:
+        markup.add(types.KeyboardButton(next_state.description))
     bot.send_message(msg.chat.id, "Choose state:", reply_markup=markup)
     user_state[msg.chat.id] = STATE_SELECTOR
 
 
+# only used for console output now
+def listener(messages):
+    for m in messages:
+        if m.content_type == 'text':
+            # print the sent message to the console
+            print(str(m.chat.first_name) + " [" + str(m.chat.id) + "]: " + m.text)
+
+
+bot.set_update_listener(listener)
 bot.polling()
