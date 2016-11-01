@@ -11,20 +11,16 @@ import sql
 from config import TOKEN
 
 
-
 WEBHOOK_HOST = 'tgbot.pik.ru'
 WEBHOOK_PORT = 443  # 443, 80, 88 or 8443 (port need to be 'open')
-WEBHOOK_LISTEN = 'tgbot.pik.ru'  # In some VPS you may need to put here the IP addr
-
-WEBHOOK_SSL_CERT = './webhook_cert.pem'  # Path to the ssl certificate
-WEBHOOK_SSL_PRIV = './webhook_pkey.pem'  # Path to the ssl private key
+WEBHOOK_LISTEN = '0.0.0.0'  # In some VPS you may need to put here the IP addr
 
 WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
-WEBHOOK_URL_PATH = "/%s/" % (API_TOKEN)
+WEBHOOK_URL_PATH = "/%s/" % (TOKEN)
 
 print(WEBHOOK_URL_BASE)
 print(WEBHOOK_URL_PATH)
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.AsyncTeleBot(TOKEN)
 
 client = pymongo.MongoClient()
 db = client.users
@@ -185,17 +181,13 @@ bot.remove_webhook()
 
 
 # Set webhook
-bot.set_webhook(url=WEBHOOK_URL_BASE+WEBHOOK_URL_PATH,
-                certificate=open(WEBHOOK_SSL_CERT, 'r'))
+bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH)
 
 
 # Start cherrypy server
 cherrypy.config.update({
     'server.socket_host': WEBHOOK_LISTEN,
-    'server.socket_port': WEBHOOK_PORT,
-    'server.ssl_module': 'builtin',
-    'server.ssl_certificate': WEBHOOK_SSL_CERT,
-    'server.ssl_private_key': WEBHOOK_SSL_PRIV
+    'server.socket_port': WEBHOOK_PORT
 })
 
 
