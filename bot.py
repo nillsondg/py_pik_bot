@@ -84,11 +84,21 @@ def cancel(msg):
     bot.reply_to(msg, "Отменено", reply_markup=types.ReplyKeyboardHide())
 
 
-@bot.message_handler(commands=[SOLD_CMD, FORECAST_CMD])
-def start_handler(msg):
+@bot.message_handler(commands=[SOLD_CMD])
+def sold(msg):
+    start_handler(msg, Type.sold)
+
+
+@bot.message_handler(commands=[FORECAST_CMD])
+def forecast(msg):
+    start_handler(msg, Type.forecast)
+
+
+def start_handler(msg, state_type):
     current_state = get_current_state(msg.chat.id)
-    if current_state == State.none:
-        user_state[msg.chat.id] = State.pik_today
+    if current_state == State.none or current_state.type == state_type:
+        current_state = State.pik_today
+        current_state.type = state_type
     elif current_state == NEED_AUTH:
         check_auth(msg)
         return
@@ -99,8 +109,7 @@ def start_handler(msg):
 def state_handler(msg):
     if get_current_state(msg.chat.id) == STATE_SELECTOR:
         user_state[msg.chat.id] = State.get_state_by_description(msg.text)
-    # todo handle
-    bot.reply_to(msg, "proc 1", reply_markup=types.ReplyKeyboardHide())
+    bot.reply_to(msg, sql_server.request(get_current_state(msg.chat.id)), reply_markup=types.ReplyKeyboardHide())
     print_step_keyboard(msg, user_state[msg.chat.id])
 
 

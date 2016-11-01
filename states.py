@@ -13,6 +13,11 @@ class Source(Enum):
     morton = "Мортон"
 
 
+class Type(Enum):
+    sold = "sold"
+    forecast = "forecast"
+
+
 class State(Enum):
     none = None, None
     pik_today = (Source.pik, Time.today)
@@ -27,6 +32,7 @@ class State(Enum):
     def __init__(self, source, time):
         self.source = source
         self.time = time
+        self.type = Type.sold
 
     @property
     def description(self):
@@ -49,14 +55,14 @@ class State(Enum):
 class StateTransitions:
     transitions = {
         State.none: [],
-        State.pik_today: [State.moscow_today, State.regions_today, State.morton_today, State.pik_yesterday],
-        State.moscow_today: [State.pik_today, State.regions_today, State.morton_today, State.moscow_yesterday],
-        State.regions_today: [State.moscow_today, State.pik_today, State.morton_today, State.regions_yesterday],
-        State.morton_today: [State.moscow_today, State.regions_today, State.pik_today, State.morton_yesterday],
-        State.pik_yesterday: [State.moscow_yesterday, State.regions_yesterday, State.morton_yesterday],
-        State.moscow_yesterday: [State.pik_yesterday, State.regions_yesterday, State.morton_yesterday],
-        State.regions_yesterday: [State.moscow_yesterday, State.pik_yesterday, State.morton_yesterday],
-        State.morton_yesterday: [State.moscow_yesterday, State.regions_yesterday, State.pik_yesterday],
+        State.pik_today: [State.moscow_today, State.regions_today, State.pik_yesterday],
+        State.moscow_today: [State.pik_today, State.regions_today, State.moscow_yesterday],
+        State.regions_today: [State.moscow_today, State.pik_today, State.regions_yesterday],
+        # State.morton_today: [State.moscow_today, State.regions_today, State.pik_today, State.morton_yesterday],
+        State.pik_yesterday: [State.moscow_yesterday, State.regions_yesterday],
+        State.moscow_yesterday: [State.pik_yesterday, State.regions_yesterday],
+        State.regions_yesterday: [State.moscow_yesterday, State.pik_yesterday],
+        # State.morton_yesterday: [State.moscow_yesterday, State.regions_yesterday, State.pik_yesterday],
     }
 
     @staticmethod
