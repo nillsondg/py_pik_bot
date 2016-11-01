@@ -130,10 +130,11 @@ class SQL:
     def execute_sales(self, sql):
         cursor = self.pik_sales_local.cursor()
         cursor.execute(sql)
+        cursor.nextset()
         row = cursor.fetchone()
         cursor.close()
         if row:
-            return row.sumArea
+            return row.areaSum
         else:
             return None
 

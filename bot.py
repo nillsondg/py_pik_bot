@@ -9,14 +9,13 @@ from states import *
 import sql
 from config import TOKEN
 
-bot = telebot.AsyncTeleBot(TOKEN)
+bot = telebot.TeleBot(TOKEN)
 
 client = pymongo.MongoClient()
 db = client.users
 
 SOLD_CMD = "sold"
 FORECAST_CMD = "forecast"
-STATE_SELECTOR = "selector"
 NEED_AUTH = "need_auth"
 user_state = dict()
 sql_server = sql.SQL()
@@ -26,6 +25,7 @@ def get_current_state(uid):
     if uid not in user_state:
         user_state[uid] = State.none
     if not check_user_id_in_db(uid):
+        # todo refactor
         return NEED_AUTH
     return user_state[uid]
 
@@ -39,7 +39,7 @@ def send_help(message):
 def send_welcome(message):
     markup = types.ReplyKeyboardHide(selective=False)
     bot.reply_to(message, "Привет!", reply_markup=markup)
-    if not check_user_id_in_db(message.from_user.uid):
+    if not check_user_id_in_db(message.from_user.id):
         bot.send_message(message.chat.id, "Введите кодовое слово")
         bot.register_next_step_handler(message, check_auth)
     else:
@@ -96,21 +96,34 @@ def forecast(msg):
 
 def start_handler(msg, state_type):
     current_state = get_current_state(msg.chat.id)
-    if current_state == State.none or current_state.type == state_type:
-        current_state = State.pik_today
-        current_state.type = state_type
-    elif current_state == NEED_AUTH:
+    if current_state == NEED_AUTH:
         check_auth(msg)
         return
-    state_handler(msg)
+    elif current_state == State.none:
+        current_state = State.pik_today
+        current_state.type = state_type
+        user_state[msg.chat.id] = current_state
+    elif isinstance(current_state, State) and current_state.type != state_type:
+        user_state[msg.chat.id].type = state_type
+    bot.send_chat_action(msg.chat.id, 'typing')
+    bot.reply_to(msg, sql_server.request(get_current_state(msg.chat.id)), reply_markup=types.ReplyKeyboardHide())
+    print_step_keyboard(msg, user_state[msg.chat.id])
 
 
 @bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) != State.none)
 def state_handler(msg):
-    if get_current_state(msg.chat.id) == STATE_SELECTOR:
-        user_state[msg.chat.id] = State.get_state_by_description(msg.text)
-    bot.reply_to(msg, sql_server.request(get_current_state(msg.chat.id)), reply_markup=types.ReplyKeyboardHide())
-    print_step_keyboard(msg, user_state[msg.chat.id])
+    current_state = get_current_state(msg.chat.id)
+    selected_state = State.get_state_by_description(msg.text)
+    if selected_state == State.none:
+        return
+    else:
+        user_state[msg.chat.id] = State.none
+    selected_state.type = current_state.type
+    bot.send_chat_action(msg.chat.id, 'typing')
+    bot.reply_to(msg, sql_server.request(selected_state), reply_markup=types.ReplyKeyboardHide())
+    print_step_keyboard(msg, selected_state)
+
+    user_state[msg.chat.id] = selected_state
 
 
 def print_step_keyboard(msg, state):
@@ -121,8 +134,8 @@ def print_step_keyboard(msg, state):
         return
     for next_state in next_states:
         markup.add(types.KeyboardButton(next_state.description))
-    bot.send_message(msg.chat.id, "Choose state:", reply_markup=markup)
-    user_state[msg.chat.id] = STATE_SELECTOR
+    bot.send_message(msg.chat.id, "Выберете следующий запрос", reply_markup=markup)
+    # bot.register_next_step_handler(msg, state_handler)
 
 
 # only used for console output now
