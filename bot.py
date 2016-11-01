@@ -6,7 +6,8 @@ import telebot
 from telebot import types
 
 from states import *
-from api_token import TOKEN
+import sql
+from config import TOKEN
 
 bot = telebot.AsyncTeleBot(TOKEN)
 
@@ -18,6 +19,7 @@ FORECAST_CMD = "forecast"
 STATE_SELECTOR = "selector"
 NEED_AUTH = "need_auth"
 user_state = dict()
+sql_server = sql.SQL()
 
 
 def get_current_state(uid):
