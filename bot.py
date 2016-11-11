@@ -4,11 +4,15 @@ import hashlib
 
 import pymongo
 import telebot
+import os
 from telebot import types
+import logging
 
 from states import *
-import sql
+from data import DataProvider
 from config import TOKEN
+
+os.environ['NO_PROXY'] = 'https://api.telegram.org'
 
 
 WEBHOOK_HOST = 'tgbot.pik.ru'
@@ -20,16 +24,18 @@ WEBHOOK_URL_PATH = "/%s/" % (TOKEN)
 
 print(WEBHOOK_URL_BASE)
 print(WEBHOOK_URL_PATH)
-bot = telebot.AsyncTeleBot(TOKEN)
+logger = telebot.logger
+telebot.logger.setLevel(logging.DEBUG)
+bot = telebot.TeleBot(TOKEN)
 
 client = pymongo.MongoClient()
 db = client.users
 
 SOLD_CMD = "sold"
 FORECAST_CMD = "forecast"
+SMS_CMD = "sms"
 NEED_AUTH = "need_auth"
 user_state = dict()
-sql_server = sql.SQL()
 
 
 def get_current_state(uid):
@@ -121,20 +127,38 @@ def forecast(msg):
     start_handler(msg, Type.forecast)
 
 
+@bot.message_handler(commands=[SMS_CMD])
+def sms(msg):
+    start_handler(msg, Type.sms)
+
+
 def start_handler(msg, state_type):
     current_state = get_current_state(msg.chat.id)
     if current_state == NEED_AUTH:
         check_auth(msg)
         return
     elif current_state == State.none:
-        current_state = State.pik_today
+        if state_type != Type.sms:
+            current_state = State.pik_today
+        else:
+            current_state = State.sms_today
         current_state.type = state_type
-        user_state[msg.chat.id] = current_state
+    elif isinstance(current_state, State) and state_type == State.type.sms:
+        current_state = State.sms_today
     elif isinstance(current_state, State) and current_state.type != state_type:
-        user_state[msg.chat.id].type = state_type
+        current_state.type = state_type
+
     bot.send_chat_action(msg.chat.id, 'typing')
-    bot.reply_to(msg, sql_server.request(get_current_state(msg.chat.id)), reply_markup=types.ReplyKeyboardHide())
-    print_step_keyboard(msg, user_state[msg.chat.id])
+    result = "Error occurred"
+    try:
+        result = DataProvider.request(current_state)
+    except Exception as e:
+        print("Error!")
+        print(e)
+        current_state = State.none
+    bot.reply_to(msg, result, reply_markup=types.ReplyKeyboardHide())
+    print_step_keyboard(msg, current_state)
+    user_state[msg.chat.id] = current_state
 
 
 @bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) != State.none)
@@ -147,9 +171,15 @@ def state_handler(msg):
         user_state[msg.chat.id] = State.none
     selected_state.type = current_state.type
     bot.send_chat_action(msg.chat.id, 'typing')
-    bot.reply_to(msg, sql_server.request(selected_state), reply_markup=types.ReplyKeyboardHide())
+    result = "Error occurred"
+    try:
+        result = DataProvider.request(selected_state)
+    except Exception as e:
+        print("Error!")
+        print(e)
+        selected_state = State.none
+    bot.reply_to(msg, result, reply_markup=types.ReplyKeyboardHide())
     print_step_keyboard(msg, selected_state)
-
     user_state[msg.chat.id] = selected_state
 
 
@@ -174,21 +204,13 @@ def listener(messages):
 
 
 bot.set_update_listener(listener)
-
-
 # Remove webhook, it fails sometimes the set if there is a previous webhook
 bot.remove_webhook()
-
-
 # Set webhook
 bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH)
-
-
 # Start cherrypy server
 cherrypy.config.update({
     'server.socket_host': WEBHOOK_LISTEN,
     'server.socket_port': WEBHOOK_PORT
 })
-
-
 cherrypy.quickstart(WebhookServer(), WEBHOOK_URL_PATH, {'/': {}})

@@ -4,6 +4,8 @@ from enum import Enum
 class Time(Enum):
     today = "Сегодня"
     yesterday = "Вчера"
+    holidays = "Выходные"
+    month = "Месяц"
 
 
 class Source(Enum):
@@ -11,11 +13,13 @@ class Source(Enum):
     moscow = "Москва"
     regions = "Регионы"
     morton = "Мортон"
+    sms = "Сводка"
 
 
 class Type(Enum):
     sold = "sold"
     forecast = "forecast"
+    sms = "sms"
 
 
 class State(Enum):
@@ -28,6 +32,11 @@ class State(Enum):
     moscow_yesterday = (Source.moscow, Time.yesterday)
     regions_yesterday = (Source.regions, Time.yesterday)
     morton_yesterday = (Source.morton, Time.yesterday)
+
+    sms_today = (Source.sms, Time.today)
+    sms_yesterday = (Source.sms, Time.yesterday)
+    sms_holidays = (Source.sms, Time.holidays)
+    sms_month = (Source.sms, Time.month)
 
     def __init__(self, source, time):
         self.source = source
@@ -55,14 +64,18 @@ class State(Enum):
 class StateTransitions:
     transitions = {
         State.none: [],
-        State.pik_today: [State.moscow_today, State.regions_today, State.pik_yesterday],
-        State.moscow_today: [State.pik_today, State.regions_today, State.moscow_yesterday],
-        State.regions_today: [State.moscow_today, State.pik_today, State.regions_yesterday],
-        # State.morton_today: [State.moscow_today, State.regions_today, State.pik_today, State.morton_yesterday],
-        State.pik_yesterday: [State.moscow_yesterday, State.regions_yesterday],
-        State.moscow_yesterday: [State.pik_yesterday, State.regions_yesterday],
-        State.regions_yesterday: [State.moscow_yesterday, State.pik_yesterday],
-        # State.morton_yesterday: [State.moscow_yesterday, State.regions_yesterday, State.pik_yesterday],
+        State.pik_today: [State.moscow_today, State.regions_today, State.morton_today, State.pik_yesterday],
+        State.moscow_today: [State.pik_today, State.regions_today, State.morton_today, State.moscow_yesterday],
+        State.regions_today: [State.moscow_today, State.pik_today, State.morton_today, State.regions_yesterday],
+        State.morton_today: [State.moscow_today, State.regions_today, State.pik_today, State.morton_yesterday],
+        State.pik_yesterday: [State.moscow_yesterday, State.regions_yesterday, State.morton_yesterday],
+        State.moscow_yesterday: [State.pik_yesterday, State.regions_yesterday, State.morton_yesterday],
+        State.regions_yesterday: [State.moscow_yesterday, State.pik_yesterday, State.morton_yesterday],
+        State.morton_yesterday: [State.moscow_yesterday, State.regions_yesterday, State.pik_yesterday],
+        State.sms_today: [State.sms_yesterday, State.sms_holidays, State.sms_month],
+        State.sms_yesterday: [State.sms_holidays, State.sms_month],
+        State.sms_holidays: [State.sms_yesterday, State.sms_month],
+        State.sms_month: [State.sms_yesterday, State.sms_holidays],
     }
 
     @staticmethod
