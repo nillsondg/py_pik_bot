@@ -58,9 +58,12 @@ class SQL:
             return None
 
     def execute_sms(self, sql):
-        connection = self.get_pik_mscrm_dw()
+        connection = self.get_pik_sales_local()
         cursor = connection.cursor()
         cursor.execute(sql)
+        cursor.nextset()
+        cursor.nextset()
+        cursor.nextset()  # особенность запроса
         row = cursor.fetchone()
         cursor.close()
         connection.close()
