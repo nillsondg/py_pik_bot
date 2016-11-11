@@ -35,39 +35,45 @@ class SQL:
     def execute_sales(self, sql):
         connection = self.get_pik_sales_local()
         cursor = connection.cursor()
-        cursor.execute(sql)
-        cursor.nextset()  # особенность запроса
-        row = cursor.fetchone()
-        cursor.close()
-        connection.close()
-        if row:
-            return row.areaSum
-        else:
-            return None
+        try:
+            cursor.execute(sql)
+            cursor.nextset()  # особенность запроса
+            row = cursor.fetchone()
+            if row:
+                return row.areaSum
+            else:
+                return None
+        finally:
+            cursor.close()
+            connection.close()
 
     def execute_forecast(self, sql):
         connection = self.get_pik_mscrm_dw()
         cursor = connection.cursor()
-        cursor.execute(sql)
-        row = cursor.fetchone()
-        cursor.close()
-        connection.close()
-        if row:
-            return row.s, row.ps
-        else:
-            return None
+        try:
+            cursor.execute(sql)
+            row = cursor.fetchone()
+            if row:
+                return row.s, row.ps
+            else:
+                return None
+        finally:
+            cursor.close()
+            connection.close()
 
     def execute_sms(self, sql):
         connection = self.get_pik_sales_local()
         cursor = connection.cursor()
-        cursor.execute(sql)
-        cursor.nextset()
-        cursor.nextset()
-        cursor.nextset()  # особенность запроса
-        row = cursor.fetchone()
-        cursor.close()
-        connection.close()
-        if row:
-            return row.txt
-        else:
-            return None
+        try:
+            cursor.execute(sql)
+            cursor.nextset()
+            cursor.nextset()
+            cursor.nextset()  # особенность запроса
+            row = cursor.fetchone()
+            if row:
+                return row.txt
+            else:
+                return None
+        finally:
+            cursor.close()
+            connection.close()

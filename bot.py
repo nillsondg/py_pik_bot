@@ -143,9 +143,11 @@ def start_handler(msg, state_type):
         else:
             current_state = State.sms_today
         current_state.type = state_type
-    elif isinstance(current_state, State) and state_type == State.type.sms:
+    elif isinstance(current_state, State) and state_type == Type.sms:
         current_state = State.sms_today
     elif isinstance(current_state, State) and current_state.type != state_type:
+        if current_state.type == Type.sms:
+            current_state = State.pik_today
         current_state.type = state_type
 
     bot.send_chat_action(msg.chat.id, 'typing')
