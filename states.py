@@ -27,11 +27,14 @@ class State(Enum):
     pik_today = (Source.pik, Time.today)
     moscow_today = (Source.moscow, Time.today)
     regions_today = (Source.regions, Time.today)
-    morton_today = (Source.morton, Time.today)
     pik_yesterday = (Source.pik, Time.yesterday)
     moscow_yesterday = (Source.moscow, Time.yesterday)
     regions_yesterday = (Source.regions, Time.yesterday)
+
+    morton_today = (Source.morton, Time.today)
     morton_yesterday = (Source.morton, Time.yesterday)
+    morton_holidays = (Source.morton, Time.holidays)
+    morton_month = (Source.morton, Time.month)
 
     sms_today = (Source.sms, Time.today)
     sms_yesterday = (Source.sms, Time.yesterday)
