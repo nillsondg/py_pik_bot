@@ -15,11 +15,10 @@ class DataProvider:
                 return morton_server.sold_request(state)
             elif state.type == Type.forecast:
                 return morton_server.forecast_request(state)
-
-        elif state.source == Source.sms:
-            return sql_server.request_sms(state)
         else:
-            if state.type == Type.sold:
+            if state.type == Type.sms:
+                return sql_server.request_sms(state)
+            elif state.type == Type.sold:
                 return sql_server.request_sales(state)
             elif state.type == Type.forecast:
                 return sql_server.request_forecast(state)

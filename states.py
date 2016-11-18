@@ -13,7 +13,7 @@ class Source(Enum):
     moscow = "Москва"
     regions = "Регионы"
     morton = "Мортон"
-    sms = "Сводка"
+    # sms = "Сводка"
 
 
 class Type(Enum):
@@ -25,21 +25,29 @@ class Type(Enum):
 class State(Enum):
     none = None, None
     pik_today = (Source.pik, Time.today)
-    moscow_today = (Source.moscow, Time.today)
-    regions_today = (Source.regions, Time.today)
     pik_yesterday = (Source.pik, Time.yesterday)
+    pik_holidays = (Source.pik, Time.holidays)
+    pik_month = (Source.pik, Time.month)
+
+    moscow_today = (Source.moscow, Time.today)
     moscow_yesterday = (Source.moscow, Time.yesterday)
+    moscow_holidays = (Source.moscow, Time.holidays)
+    moscow_month = (Source.moscow, Time.month)
+
+    regions_today = (Source.regions, Time.today)
     regions_yesterday = (Source.regions, Time.yesterday)
+    regions_holidays = (Source.regions, Time.holidays)
+    regions_month = (Source.regions, Time.month)
 
     morton_today = (Source.morton, Time.today)
     morton_yesterday = (Source.morton, Time.yesterday)
     morton_holidays = (Source.morton, Time.holidays)
     morton_month = (Source.morton, Time.month)
 
-    sms_today = (Source.sms, Time.today)
-    sms_yesterday = (Source.sms, Time.yesterday)
-    sms_holidays = (Source.sms, Time.holidays)
-    sms_month = (Source.sms, Time.month)
+    # sms_today = (Source.sms, Time.today)
+    # sms_yesterday = (Source.sms, Time.yesterday)
+    # sms_holidays = (Source.sms, Time.holidays)
+    # sms_month = (Source.sms, Time.month)
 
     def __init__(self, source, time):
         self.source = source
@@ -67,18 +75,27 @@ class State(Enum):
 class StateTransitions:
     transitions = {
         State.none: [],
+
         State.pik_today: [State.moscow_today, State.regions_today, State.morton_today, State.pik_yesterday],
-        State.moscow_today: [State.pik_today, State.regions_today, State.morton_today, State.moscow_yesterday],
-        State.regions_today: [State.moscow_today, State.pik_today, State.morton_today, State.regions_yesterday],
-        State.morton_today: [State.moscow_today, State.regions_today, State.pik_today, State.morton_yesterday],
-        State.pik_yesterday: [State.moscow_yesterday, State.regions_yesterday, State.morton_yesterday],
-        State.moscow_yesterday: [State.pik_yesterday, State.regions_yesterday, State.morton_yesterday],
-        State.regions_yesterday: [State.moscow_yesterday, State.pik_yesterday, State.morton_yesterday],
-        State.morton_yesterday: [State.moscow_yesterday, State.regions_yesterday, State.pik_yesterday],
-        State.sms_today: [State.sms_yesterday, State.sms_holidays, State.sms_month],
-        State.sms_yesterday: [State.sms_holidays, State.sms_month],
-        State.sms_holidays: [State.sms_yesterday, State.sms_month],
-        State.sms_month: [State.sms_yesterday, State.sms_holidays],
+        State.pik_yesterday: [State.pik_holidays, State.pik_month],
+        State.pik_holidays: [State.pik_month],
+        State.pik_month: [],
+
+        State.moscow_today: [State.moscow_yesterday],
+        State.moscow_yesterday: [],
+
+        State.regions_today: [State.regions_yesterday],
+        State.regions_yesterday: [],
+
+        State.morton_today: [State.morton_month, State.morton_holidays, State.morton_yesterday],
+        State.morton_yesterday: [State.morton_holidays, State.morton_month],
+        State.morton_holidays: [State.morton_month],
+        State.morton_month: [],
+
+        # State.sms_today: [State.sms_yesterday, State.sms_holidays, State.sms_month],
+        # State.sms_yesterday: [State.sms_holidays, State.sms_month],
+        # State.sms_holidays: [State.sms_month],
+        # State.sms_month: [],
     }
 
     @staticmethod

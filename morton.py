@@ -57,23 +57,27 @@ class Morton:
             return 'Не могу подключиться к Мортон'
         today = datetime.now()
         yesterday = datetime.now() - timedelta(days=1)
-        if state == state.morton_today:
+        if state == State.morton_today:
             return self.sales_strings[state].format(self.sum_sold(data, today.day))
-        elif state == state.morton_yesterday:
+        elif state == State.morton_yesterday:
             return self.sales_strings[state].format(self.sum_sold(data, yesterday.day))
-        return None
+        else:
+            return "Нет информации"
 
     def sum_sold(self, data, day):
         result = 0.00
         for i in data:
-            if i["day"] == day:
-                result += i["area"]
+            if int(i["day"]) == day:
+                result += float(i["area"])
         return round(result, 2)
 
     def request(self, path):
         payload = {'token': config.MORTON_TOKEN}
-        header = {'Accept': "application"}
-        r = requests.get(self.host + path, params=payload, header=header)
+        # header = {'Accept': "application"}
+        try:
+            r = requests.get(self.host + path, params=payload)
+        except requests.exceptions.HTTPError:
+            return None
         if r.status_code != requests.codes.ok:
             return None
         return r.json()["data"]

@@ -2,6 +2,7 @@ import pyodbc
 
 import config
 from sqlqueries import *
+from states import *
 
 
 def get_sql_config(server, database):
@@ -30,6 +31,8 @@ class SQL:
         return forecast_strings[state].format(s=round(s, 2), ps=round(ps, 2))
 
     def request_sms(self, state):
+        if state.source != Source.pik:
+            return "Нет данных"
         return self.execute_sms(sms_requests[state])
 
     def execute_sales(self, sql):

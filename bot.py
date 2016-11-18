@@ -137,17 +137,16 @@ def start_handler(msg, state_type):
     if current_state == NEED_AUTH:
         check_auth(msg)
         return
+    # init state
     elif current_state == State.none:
-        if state_type != Type.sms:
-            current_state = State.pik_today
-        else:
-            current_state = State.sms_today
+        current_state = State.pik_today
         current_state.type = state_type
-    elif isinstance(current_state, State) and state_type == Type.sms:
-        current_state = State.sms_today
+    # change branch
     elif isinstance(current_state, State) and current_state.type != state_type:
-        if current_state.type == Type.sms:
-            current_state = State.pik_today
+        current_state.type = state_type
+    # reset state
+    elif isinstance(current_state, State) and current_state.type == state_type:
+        current_state = State.pik_today
         current_state.type = state_type
 
     bot.send_chat_action(msg.chat.id, 'typing')
@@ -206,11 +205,9 @@ def listener(messages):
 
 
 bot.set_update_listener(listener)
-# Remove webhook, it fails sometimes the set if there is a previous webhook
 bot.remove_webhook()
-# Set webhook
 bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH)
-# Start cherrypy server
+
 cherrypy.config.update({
     'server.socket_host': WEBHOOK_LISTEN,
     'server.socket_port': WEBHOOK_PORT

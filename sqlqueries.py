@@ -98,24 +98,24 @@ forecast_requests = {
 }
 
 sms_requests = {
-    State.sms_today:
+    State.pik_today:
         '''
           exec plan_fact_sms
           select * from plan_fact_sms_cache
         ''',
-    State.sms_yesterday:
+    State.pik_yesterday:
         '''
           declare @ts datetime = dateadd(dd, -1, getdate())
           exec plan_fact_sms @ts
           select * from plan_fact_sms_cache
         ''',
-    State.sms_holidays:
+    State.pik_holidays:
         '''
           declare @ts datetime = dateadd(dd, -2, getdate())
           exec plan_fact_sms @ts, 2
           select * from plan_fact_sms_cache
         ''',
-    State.sms_month:
+    State.pik_month:
         '''
           declare @today as date = getdate()
           declare @monthFirst as date = dateadd(month, datediff(month, 0, @today), 0)
