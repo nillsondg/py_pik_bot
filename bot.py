@@ -127,40 +127,47 @@ def start_handler(msg, state_type):
         current_state = State.pik_today
         current_state.type = state_type
 
-    bot.send_chat_action(msg.chat.id, 'typing')
-    result = "Error occurred"
-    try:
-        result = DataProvider.request(current_state)
-    except Exception as e:
-        print("Error!")
-        print(e)
-        current_state = State.none
-    print_result_and_nextstep_keyboard(msg, result, current_state)
-    user_state[msg.chat.id] = current_state
+    user_state[msg.chat.id] = process_request_and_return_state(msg, current_state)
 
 
 @bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) != State.none)
 def state_handler(msg):
     current_state = get_current_state(msg.chat.id)
     selected_state = State.get_state_by_description(msg.text)
+    # switch to prevent next request before first done
     if selected_state == State.none:
         return
     else:
         user_state[msg.chat.id] = State.none
     selected_state.type = current_state.type
+
+    user_state[msg.chat.id] = process_request_and_return_state(msg, selected_state)
+
+
+def process_request_and_return_state(msg, state):
     bot.send_chat_action(msg.chat.id, 'typing')
     result = "Error occurred"
     try:
-        result = DataProvider.request(selected_state)
+        result = DataProvider.request(state)
     except Exception as e:
         print("Error!")
         print(e)
-        selected_state = State.none
-    print_result_and_nextstep_keyboard(msg, result, selected_state)
-    user_state[msg.chat.id] = selected_state
+        state = State.none
+
+    if isinstance(result, (list, tuple)):
+        bot.send_message(msg.chat.id, format_cache_time(result[1]))
+        print_text_and_nextstep_keyboard(msg, result[0], state)
+    else:
+        print_text_and_nextstep_keyboard(msg, result, state)
+
+    return state
 
 
-def print_result_and_nextstep_keyboard(msg, text, state):
+def format_cache_time(datetime):
+    return "Данные, актуальные на " + datetime.strftime("%d-%m %H:%M:%S")
+
+
+def print_text_and_nextstep_keyboard(msg, text, state):
     markup = types.ReplyKeyboardMarkup()
     next_states = StateTransitions.get_transition_for_state(state)
     if len(next_states) == 0:
