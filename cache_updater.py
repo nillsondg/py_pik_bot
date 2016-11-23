@@ -13,7 +13,7 @@ morton_server = morton.Morton()
 mongo = mongodb.MongoDB()
 
 s = sched.scheduler(time.time, time.sleep)
-TWENTY_MINUTES_IN_SECONDS = 72000
+TWENTY_MINUTES_IN_SECONDS = 1200
 
 
 def recache_sms(sc):
