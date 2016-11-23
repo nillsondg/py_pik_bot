@@ -13,7 +13,6 @@ class Source(Enum):
     moscow = "Москва"
     regions = "Регионы"
     morton = "Мортон"
-    # sms = "Сводка"
 
 
 class Type(Enum):
@@ -43,11 +42,6 @@ class State(Enum):
     morton_yesterday = (Source.morton, Time.yesterday)
     morton_holidays = (Source.morton, Time.holidays)
     morton_month = (Source.morton, Time.month)
-
-    # sms_today = (Source.sms, Time.today)
-    # sms_yesterday = (Source.sms, Time.yesterday)
-    # sms_holidays = (Source.sms, Time.holidays)
-    # sms_month = (Source.sms, Time.month)
 
     def __init__(self, source, time):
         self.source = source
@@ -90,12 +84,7 @@ class StateTransitions:
         State.morton_today: [State.morton_month, State.morton_holidays, State.morton_yesterday],
         State.morton_yesterday: [State.morton_holidays, State.morton_month],
         State.morton_holidays: [State.morton_month],
-        State.morton_month: [],
-
-        # State.sms_today: [State.sms_yesterday, State.sms_holidays, State.sms_month],
-        # State.sms_yesterday: [State.sms_holidays, State.sms_month],
-        # State.sms_holidays: [State.sms_month],
-        # State.sms_month: [],
+        State.morton_month: []
     }
 
     @staticmethod

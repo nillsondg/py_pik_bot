@@ -23,7 +23,7 @@ class DataProvider:
             if state.type == Type.sms:
                 last_cached_time = mongo.get_last_cached_time(state.type, state)
                 if (last_cached_time is None
-                    or datetime.datetime.now() - last_cached_time > datetime.timedelta(minutes=2)):
+                        or datetime.datetime.now() - last_cached_time > datetime.timedelta(minutes=2)):
                     data = sql_server.request_sms(state)
                     mongo.cache(data, state.type, state)
                     return data, datetime.datetime.now()

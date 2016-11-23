@@ -67,7 +67,7 @@ def send_help(message):
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    markup = types.ReplyKeyboardHide(selective=False)
+    # markup = types.ReplyKeyboardHide(selective=False)
     # bot.reply_to(message, "Привет!", reply_markup=markup)
     if not mongo.check_user_id_in_db(message.from_user.id):
         bot.send_message(message.chat.id, "Введите кодовое слово")
