@@ -15,21 +15,29 @@ class DataProvider:
         if state.source == Source.morton:
             if state.type == Type.sms:
                 return morton_server.sms_request(state)
-            elif state.type == Type.sold:
-                return morton_server.sold_request(state)
-            elif state.type == Type.forecast:
-                return morton_server.forecast_request(state)
+        else:
+            if state.type == Type.sms:
+                return sql_server.request_sms(state)
+
+    @staticmethod
+    def request_with_cache(state, last_request_time):
+        if state.source == Source.morton:
+            if state.type == Type.sms:
+                last_cached_time = mongo.get_last_cached_time(state.type, state)
+                if (last_request_time is not None
+                        and datetime.datetime.now() - last_request_time < datetime.timedelta(seconds=20)):
+                    data = morton_server.sms_request(state)
+                    mongo.cache(data, state.type, state)
+                    return data, datetime.datetime.now()
+                else:
+                    return mongo.get_cache(state.type, state)["txt"], last_cached_time
         else:
             if state.type == Type.sms:
                 last_cached_time = mongo.get_last_cached_time(state.type, state)
-                if (last_cached_time is None
-                        or datetime.datetime.now() - last_cached_time > datetime.timedelta(minutes=2)):
+                if (last_request_time is not None
+                        and datetime.datetime.now() - last_request_time < datetime.timedelta(seconds=20)):
                     data = sql_server.request_sms(state)
                     mongo.cache(data, state.type, state)
                     return data, datetime.datetime.now()
                 else:
                     return mongo.get_cache(state.type, state)["txt"], last_cached_time
-            elif state.type == Type.sold:
-                return sql_server.request_sales(state)
-            elif state.type == Type.forecast:
-                return sql_server.request_forecast(state)

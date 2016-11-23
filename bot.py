@@ -10,6 +10,7 @@ import mongodb
 from states import *
 from data import DataProvider
 from config import TOKEN
+import datetime
 
 os.environ['NO_PROXY'] = 'https://api.telegram.org'
 
@@ -32,16 +33,31 @@ FORECAST_CMD = "forecast"
 SMS_CMD = "sms"
 NEED_AUTH = "need_auth"
 user_state = dict()
+user_last_state = dict()
+user_last_request_time = dict()
 mongo = mongodb.MongoDB()
 
 
 def get_current_state(uid):
     if uid not in user_state:
         user_state[uid] = State.none
-    if not mongo.check_user_id_in_db(uid):
-        # todo refactor
-        return NEED_AUTH
     return user_state[uid]
+
+
+def get_user_last_state(uid):
+    if uid not in user_last_state:
+        user_last_state[uid] = State.none
+    return user_last_state[uid]
+
+
+def get_last_request_time(uid):
+    if uid not in user_last_request_time:
+        user_last_request_time[uid] = None
+    return user_last_request_time[uid]
+
+
+def set_last_request_time_now(uid):
+    user_last_request_time[uid] = datetime.datetime.now()
 
 
 # WebhookServer, process webhook calls
@@ -67,18 +83,17 @@ def send_help(message):
 
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    # markup = types.ReplyKeyboardHide(selective=False)
-    # bot.reply_to(message, "Привет!", reply_markup=markup)
     if not mongo.check_user_id_in_db(message.from_user.id):
         bot.send_message(message.chat.id, "Введите кодовое слово")
         bot.register_next_step_handler(message, check_auth)
     else:
         mongo.update_user_auth(message.from_user)
+        print_sms_keyboard(message, "Клавиатура обновлена")
 
 
 def check_auth(message):
     if check_code(message.text):
-        bot.reply_to(message, "Добро пожаловать")
+        print_sms_keyboard(message, "Добро пожаловать")
         mongo.add_user_into_db(message.from_user)
     else:
         bot.reply_to(message, "Неверно, попробуйте еще")
@@ -89,95 +104,71 @@ def check_code(code):
     return hashlib.md5(code.encode('utf-8')).hexdigest() == "bc250e0d83c37b0953ada14e7bbc1dfd"
 
 
-@bot.message_handler(commands=['cancel'])
-def cancel(msg):
-    user_state[msg.chat.id] = State.none
-    bot.reply_to(msg, "Отменено", reply_markup=types.ReplyKeyboardHide())
-
-
-@bot.message_handler(commands=[SOLD_CMD])
-def sold(msg):
-    start_handler(msg, Type.sold)
-
-
-@bot.message_handler(commands=[FORECAST_CMD])
-def forecast(msg):
-    start_handler(msg, Type.forecast)
-
-
 @bot.message_handler(commands=[SMS_CMD])
 def sms(msg):
-    start_handler(msg, Type.sms)
+    start_handler(msg, State.pik_today)
 
 
-def start_handler(msg, state_type):
+@bot.message_handler(func=lambda msg: msg.text == Source.pik.value)
+def sms_pik(msg):
+    start_handler(msg, State.pik_today)
+
+
+@bot.message_handler(func=lambda msg: msg.text == Source.morton.value)
+def sms_morton(msg):
+    start_handler(msg, State.morton_today)
+
+
+def start_handler(msg, state):
+    state.type = Type.sms
+
     current_state = get_current_state(msg.chat.id)
-    if current_state == NEED_AUTH:
+    if not mongo.check_user_id_in_db(msg.from_user.id):
         check_auth(msg)
         return
-    # init state
-    elif current_state == State.none:
-        current_state = State.pik_today
-        current_state.type = state_type
-    # change branch
-    elif isinstance(current_state, State) and current_state.type != state_type:
-        current_state.type = state_type
-    # reset state
-    elif isinstance(current_state, State) and current_state.type == state_type:
-        current_state = State.pik_today
-        current_state.type = state_type
 
-    user_state[msg.chat.id] = process_request_and_return_state(msg, current_state)
-
-
-@bot.message_handler(func=lambda msg: get_current_state(msg.chat.id) != State.none)
-def state_handler(msg):
-    current_state = get_current_state(msg.chat.id)
-    selected_state = State.get_state_by_description(msg.text)
     # switch to prevent next request before first done
-    if selected_state == State.none:
+    if current_state != State.none:
         return
     else:
-        user_state[msg.chat.id] = State.none
-    selected_state.type = current_state.type
+        user_state[msg.chat.id] = state
+    process_request(msg, state)
+    user_state[msg.chat.id] = State.none
+    set_last_request_time_now(msg.chat.id)
+    user_last_state[msg.chat.id] = state
 
-    user_state[msg.chat.id] = process_request_and_return_state(msg, selected_state)
 
-
-def process_request_and_return_state(msg, state):
+def process_request(msg, state):
     bot.send_chat_action(msg.chat.id, 'typing')
-    result = "Error occurred"
+    result = "Произошла ошибка"
     try:
-        result = DataProvider.request(state)
+        if get_user_last_state(msg.chat.id) == state:
+            result = DataProvider.request_with_cache(state, get_last_request_time(msg.chat.id))
+        else:
+            result = DataProvider.request_with_cache(state, None)
     except Exception as e:
+        # todo log
         print("Error!")
         print(e)
         state = State.none
 
     if isinstance(result, (list, tuple)):
         bot.send_message(msg.chat.id, format_cache_time(result[1]))
-        print_text_and_nextstep_keyboard(msg, result[0], state)
+        bot.send_message(msg.chat.id, result[0])
     else:
-        print_text_and_nextstep_keyboard(msg, result, state)
+        bot.send_message(msg.chat.id, result)
 
     return state
 
 
-def format_cache_time(datetime):
-    return "Данные, актуальные на " + datetime.strftime("%d-%m %H:%M:%S")
+def format_cache_time(date_time):
+    return "Данные, актуальные на " + date_time.strftime("%d-%m %H:%M:%S")
 
 
-def print_text_and_nextstep_keyboard(msg, text, state):
-    markup = types.ReplyKeyboardMarkup()
-    next_states = StateTransitions.get_transition_for_state(state)
-    if len(next_states) == 0:
-        user_state[msg.chat.id] = State.none
-        bot.send_message(msg.chat.id, text, reply_markup=types.ReplyKeyboardHide())
-        return
-    for next_state in next_states:
-        markup.add(types.KeyboardButton(next_state.description))
+def print_sms_keyboard(msg, text):
+    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True, one_time_keyboard=False)
+    markup.row(types.KeyboardButton(Source.pik.value), types.KeyboardButton(Source.morton.value))
     bot.send_message(msg.chat.id, text, reply_markup=markup)
-    # bot.register_next_step_handler(msg, state_handler)
 
 
 # only used for console output now

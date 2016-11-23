@@ -26,7 +26,7 @@ class Morton:
         return 'Нет данных по потецниалу Мортон'
 
     def sms_request(self, state):
-        data = self.request(self.sms_path)
+        data = self.__request(self.sms_path)
         if data is None:
             return 'Не могу подключиться к Мортон'
         for i in data:
@@ -40,7 +40,7 @@ class Morton:
         return txt
 
     def old_request(self, state):
-        data = self.request(self.old_path)
+        data = self.__request(self.old_path)
         if data is None:
             return 'Не могу подключиться к Мортон'
         for i in data:
@@ -52,7 +52,7 @@ class Morton:
         return txt.replace("Отчет за", 'Контрактация за')
 
     def sold_request(self, state):
-        data = self.request(self.sold_path)
+        data = self.__request(self.sold_path)
         if data is None:
             return 'Не могу подключиться к Мортон'
         today = datetime.now()
@@ -71,7 +71,7 @@ class Morton:
                 result += float(i["area"])
         return round(result, 2)
 
-    def request(self, path):
+    def __request(self, path):
         payload = {'token': config.MORTON_TOKEN}
         # header = {'Accept': "application"}
         try:
