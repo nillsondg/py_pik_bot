@@ -88,7 +88,7 @@ def send_welcome(message):
         bot.register_next_step_handler(message, check_auth)
     else:
         mongo.update_user_auth(message.from_user)
-        print_sms_keyboard(message, "Клавиатура обновлена")
+        print_sms_keyboard(message, "Введите команду")
 
 
 def check_auth(message):
@@ -96,12 +96,12 @@ def check_auth(message):
         print_sms_keyboard(message, "Добро пожаловать")
         mongo.add_user_into_db(message.from_user)
     else:
-        bot.reply_to(message, "Неверно, попробуйте еще")
+        bot.reply_to(message, "Неверно, попробуйте еще", disable_notification=True)
         bot.register_next_step_handler(message, check_auth)
 
 
 def check_code(code):
-    return hashlib.md5(code.encode('utf-8')).hexdigest() == "bc250e0d83c37b0953ada14e7bbc1dfd"
+    return hashlib.md5(code.encode('utf-8')).hexdigest() == "70dda5dfb8053dc6d1c492574bce9bfd"
 
 
 @bot.message_handler(commands=[SMS_CMD])
@@ -153,22 +153,22 @@ def process_request(msg, state):
         state = State.none
 
     if isinstance(result, (list, tuple)):
-        bot.send_message(msg.chat.id, format_cache_time(result[1]))
-        bot.send_message(msg.chat.id, result[0])
+        bot.send_message(msg.chat.id, format_cache_time(result[1]), disable_notification=True, parse_mode="Markdown")
+        bot.send_message(msg.chat.id, result[0], disable_notification=True)
     else:
-        bot.send_message(msg.chat.id, result)
+        bot.send_message(msg.chat.id, result, disable_notification=True)
 
     return state
 
 
 def format_cache_time(date_time):
-    return "Данные, актуальные на " + date_time.strftime("%d-%m %H:%M:%S")
+    return "_@" + date_time.strftime("%H:%M:%S") + "_"
 
 
 def print_sms_keyboard(msg, text):
     markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True, one_time_keyboard=False)
     markup.row(types.KeyboardButton(Source.pik.value), types.KeyboardButton(Source.morton.value))
-    bot.send_message(msg.chat.id, text, reply_markup=markup)
+    bot.send_message(msg.chat.id, text, reply_markup=markup, disable_notification=True)
 
 
 # only used for console output now

@@ -100,8 +100,15 @@ forecast_requests = {
 sms_requests = {
     State.pik_today:
         '''
-          exec plan_fact_sms
-          select * from plan_fact_sms_cache
+          exec tgbot_sms_pik
+          select
+            cast(coalesce(c1.text, c2.text, 'Нет продаж') as varchar(max)) as txt
+          from tgbot_sms_cache as c1
+          inner join tgbot_sms_cache as c2
+            on c2.company = c1.company
+            and c2.period = 1
+          where c1.period = 0
+            and c1.company = 0 -- ПИК
         ''',
     State.pik_yesterday:
         '''
@@ -123,5 +130,17 @@ sms_requests = {
 
           exec plan_fact_sms @monthFirst, @monthCurrent
           select * from plan_fact_sms_cache
+        ''',
+    State.morton_today:
+        '''
+          exec tgbot_sms_morton
+          select
+            cast(coalesce(c1.text, c2.text, 'Нет продаж') as varchar(max)) as txt
+          from tgbot_sms_cache as c1
+          inner join tgbot_sms_cache as c2
+            on c2.company = c1.company
+            and c2.period = 1
+          where c1.period = 0
+            and c1.company = 1 -- Мортон
         '''
 }

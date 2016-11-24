@@ -31,8 +31,6 @@ class SQL:
         return forecast_strings[state].format(s=round(s, 2), ps=round(ps, 2))
 
     def request_sms(self, state):
-        if state.source != Source.pik:
-            return "Нет данных"
         return self.execute_sms(sms_requests[state])
 
     def execute_sales(self, sql):
@@ -71,7 +69,8 @@ class SQL:
             cursor.execute(sql)
             cursor.nextset()
             cursor.nextset()
-            cursor.nextset()  # особенность запроса
+            cursor.nextset()
+            cursor.nextset()
             row = cursor.fetchone()
             if row:
                 return row.txt
