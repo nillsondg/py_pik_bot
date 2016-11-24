@@ -25,7 +25,9 @@ WEBHOOK_URL_PATH = "/%s/" % (TOKEN)
 print(WEBHOOK_URL_BASE)
 print(WEBHOOK_URL_PATH)
 logger = telebot.logger
-telebot.logger.setLevel(logging.DEBUG)
+logging.basicConfig(filename="bot.log")
+logging.getLogger().addHandler(logging.StreamHandler())
+telebot.logger.setLevel(logging.INFO)
 bot = telebot.TeleBot(TOKEN)
 
 SOLD_CMD = "sold"
@@ -147,8 +149,8 @@ def process_request(msg, state):
         else:
             result = DataProvider.request_with_cache(state, None)
     except Exception as e:
-        # todo log
-        print("Error!")
+        logging.error(e)
+        print("ERROR!")
         print(e)
         state = State.none
 
@@ -162,6 +164,8 @@ def process_request(msg, state):
 
 
 def format_cache_time(date_time):
+    # cause server incorrect time
+    date_time -= datetime.timedelta(hours=1)
     return "_@" + date_time.strftime("%H:%M:%S") + "_"
 
 

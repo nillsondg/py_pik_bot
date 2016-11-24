@@ -3,7 +3,10 @@ from states import *
 import mongodb
 import sched
 import time
+import logging
 
+logging.basicConfig(filename="cache_updater.log", level=logging.INFO)
+logging.getLogger().addHandler(logging.StreamHandler())
 sql_server = sql.SQL()
 mongo = mongodb.MongoDB()
 
@@ -19,7 +22,7 @@ def recache_sms(sc):
         data = sql_server.request_sms(State.pik_today)
         mongo.cache(data, Type.sms, State.pik_today)
     except Exception as e:
-        # todo log
+        logging.error(e)
         print("Error!")
         print(e)
     s.enter(CACHE_TTL, 1, recache_sms, (sc,))

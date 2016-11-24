@@ -1,6 +1,7 @@
 import pymongo
 import datetime
 from states import Type
+import logging
 
 
 class MongoDB:
@@ -42,7 +43,7 @@ class MongoDB:
             "cached_at": datetime.datetime.now(),
             "requested_at": datetime.datetime.now()
         }}, upsert=True)
-        print(datetime.datetime.now().strftime("%d-%m %H:%M:%S") + " cached " + cache_name)
+        logging.info(datetime.datetime.now().strftime("%d-%m %H:%M:%S") + " cached " + cache_name)
 
     def get_cache(self, cache_type, state):
         if cache_type == Type.sms:
