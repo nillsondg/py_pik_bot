@@ -1,24 +1,65 @@
-import telebot
 import cherrypy
 import hashlib
 
-API_TOKEN = "266702664:AAGe1ssRKsrCdsnPhcdXjeI0WM-CJIJ15sY"
+import telebot
+import os
+from telebot import types
+import logging
+import mongodb
+
+from states import *
+from data import DataProvider
+from config import TOKEN
+import datetime
+
+os.environ['NO_PROXY'] = 'https://api.telegram.org'
+
 
 WEBHOOK_HOST = 'tgbot.pik.ru'
 WEBHOOK_PORT = 443  # 443, 80, 88 or 8443 (port need to be 'open')
-WEBHOOK_LISTEN = 'tgbot.pik.ru'  # In some VPS you may need to put here the IP addr
-
-WEBHOOK_SSL_CERT = './webhook_cert.pem'  # Path to the ssl certificate
-WEBHOOK_SSL_PRIV = './webhook_pkey.pem'  # Path to the ssl private key
+WEBHOOK_LISTEN = '0.0.0.0'  # In some VPS you may need to put here the IP addr
 
 WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
-WEBHOOK_URL_PATH = "/%s/" % (API_TOKEN)
+WEBHOOK_URL_PATH = "/%s/" % (TOKEN)
 
 print(WEBHOOK_URL_BASE)
 print(WEBHOOK_URL_PATH)
-bot = telebot.TeleBot(API_TOKEN)
-users = []
-auth_requested = False
+logger = telebot.logger
+logging.basicConfig(filename="bot.log")
+logging.getLogger().addHandler(logging.StreamHandler())
+telebot.logger.setLevel(logging.INFO)
+bot = telebot.TeleBot(TOKEN)
+
+SOLD_CMD = "sold"
+FORECAST_CMD = "forecast"
+SMS_CMD = "sms"
+NEED_AUTH = "need_auth"
+user_state = dict()
+user_last_state = dict()
+user_last_request_time = dict()
+mongo = mongodb.MongoDB()
+
+
+def get_current_state(uid):
+    if uid not in user_state:
+        user_state[uid] = State.none
+    return user_state[uid]
+
+
+def get_user_last_state(uid):
+    if uid not in user_last_state:
+        user_last_state[uid] = State.none
+    return user_last_state[uid]
+
+
+def get_last_request_time(uid):
+    if uid not in user_last_request_time:
+        user_last_request_time[uid] = None
+    return user_last_request_time[uid]
+
+
+def set_last_request_time_now(uid):
+    user_last_request_time[uid] = datetime.datetime.now()
 
 
 # WebhookServer, process webhook calls
@@ -38,54 +79,116 @@ class WebhookServer(object):
 
 
 @bot.message_handler(commands=['help'])
-def send_welcome(message):
+def send_help(message):
     bot.reply_to(message, "Это может помочь… или нет")
 
 
-@bot.message_handler(func=lambda m: auth_requested)
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    if not mongo.check_user_id_in_db(message.from_user.id):
+        bot.send_message(message.chat.id, "Введите кодовое слово")
+        bot.register_next_step_handler(message, check_auth)
+    else:
+        mongo.update_user_auth(message.from_user)
+        print_sms_keyboard(message, "Введите команду")
+
+
 def check_auth(message):
     if check_code(message.text):
-        users.append(message.from_user.username)
-        global auth_requested
-        auth_requested = False
-        bot.reply_to(message, "Добро пожаловать")
+        print_sms_keyboard(message, "Добро пожаловать")
+        mongo.add_user_into_db(message.from_user)
     else:
-        bot.reply_to(message, "Неверно, попроуйте еще")
+        bot.reply_to(message, "Неверно, попробуйте еще", disable_notification=True)
+        bot.register_next_step_handler(message, check_auth)
 
 
 def check_code(code):
-    return hashlib.md5(code.encode('utf-8')).hexdigest() == "bc250e0d83c37b0953ada14e7bbc1dfd"
+    return hashlib.md5(code.encode('utf-8')).hexdigest() == "70dda5dfb8053dc6d1c492574bce9bfd"
 
 
-@bot.message_handler(commands=['start'])
-@bot.message_handler(func=lambda m: True)
-def send_welcome(message):
-    bot.reply_to(message, "Привет!")
-    username = message.from_user.username
-    if username not in users:
-        bot.send_message(message.chat.id, "Введите кодовое слово")
-        global auth_requested
-        auth_requested = True
+@bot.message_handler(commands=[SMS_CMD])
+def sms(msg):
+    start_handler(msg, State.pik_today)
 
 
+@bot.message_handler(func=lambda msg: msg.text == Source.pik.value)
+def sms_pik(msg):
+    start_handler(msg, State.pik_today)
 
-# Remove webhook, it fails sometimes the set if there is a previous webhook
+
+@bot.message_handler(func=lambda msg: msg.text == Source.morton.value)
+def sms_morton(msg):
+    start_handler(msg, State.morton_today)
+
+
+def start_handler(msg, state):
+    state.type = Type.sms
+
+    current_state = get_current_state(msg.chat.id)
+    if not mongo.check_user_id_in_db(msg.from_user.id):
+        check_auth(msg)
+        return
+
+    # switch to prevent next request before first done
+    if current_state != State.none:
+        return
+    else:
+        user_state[msg.chat.id] = state
+    process_request(msg, state)
+    user_state[msg.chat.id] = State.none
+    set_last_request_time_now(msg.chat.id)
+    user_last_state[msg.chat.id] = state
+
+
+def process_request(msg, state):
+    bot.send_chat_action(msg.chat.id, 'typing')
+    result = "Произошла ошибка"
+    try:
+        if get_user_last_state(msg.chat.id) == state:
+            result = DataProvider.request_with_cache(state, get_last_request_time(msg.chat.id))
+        else:
+            result = DataProvider.request_with_cache(state, None)
+    except Exception as e:
+        logging.error(e)
+        print("ERROR!")
+        print(e)
+        state = State.none
+
+    if isinstance(result, (list, tuple)):
+        bot.send_message(msg.chat.id, format_cache_time(result[1]), disable_notification=True, parse_mode="Markdown")
+        bot.send_message(msg.chat.id, result[0], disable_notification=True)
+    else:
+        bot.send_message(msg.chat.id, result, disable_notification=True)
+
+    return state
+
+
+def format_cache_time(date_time):
+    # cause server incorrect time
+    date_time -= datetime.timedelta(hours=1)
+    return "_@" + date_time.strftime("%H:%M:%S") + "_"
+
+
+def print_sms_keyboard(msg, text):
+    markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True, one_time_keyboard=False)
+    markup.row(types.KeyboardButton(Source.pik.value), types.KeyboardButton(Source.morton.value))
+    bot.send_message(msg.chat.id, text, reply_markup=markup, disable_notification=True)
+
+
+# only used for console output now
+def listener(messages):
+    for m in messages:
+        if m.content_type == 'text':
+            # print the sent message to the console
+            print(str(m.chat.first_name) + " [" + str(m.chat.id) + "]: " + m.text)
+
+
+bot.set_update_listener(listener)
 bot.remove_webhook()
+bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH)
 
-
-# Set webhook
-bot.set_webhook(url=WEBHOOK_URL_BASE+WEBHOOK_URL_PATH,
-                certificate=open(WEBHOOK_SSL_CERT, 'r'))
-
-
-# Start cherrypy server
 cherrypy.config.update({
     'server.socket_host': WEBHOOK_LISTEN,
-    'server.socket_port': WEBHOOK_PORT,
-    'server.ssl_module': 'builtin',
-    'server.ssl_certificate': WEBHOOK_SSL_CERT,
-    'server.ssl_private_key': WEBHOOK_SSL_PRIV
+    'server.socket_port': WEBHOOK_PORT
 })
-
-
 cherrypy.quickstart(WebhookServer(), WEBHOOK_URL_PATH, {'/': {}})
