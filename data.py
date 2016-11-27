@@ -13,23 +13,19 @@ class DataProvider:
     def request_with_cache(state, last_request_time):
         if state.source == Source.morton:
             if state.type == Type.sms:
-                last_cached_time = mongo.get_last_cached_time(state.type, state)
-                if (last_request_time is not None
-                    and datetime.datetime.now() - last_request_time < datetime.timedelta(
-                        seconds=SECONDS_TO_MANUAL_RECACHE)):
-                    data = sql_server.request_sms(state)
-                    mongo.cache(data, state.type, state)
-                    return data, datetime.datetime.now()
-                else:
-                    return mongo.get_cache(state.type, state)["txt"], last_cached_time
+                return DataProvider.__get_sms(state, last_request_time)
         else:
             if state.type == Type.sms:
-                last_cached_time = mongo.get_last_cached_time(state.type, state)
-                if (last_request_time is not None
-                    and datetime.datetime.now() - last_request_time < datetime.timedelta(
-                        seconds=SECONDS_TO_MANUAL_RECACHE)):
-                    data = sql_server.request_sms(state)
-                    mongo.cache(data, state.type, state)
-                    return data, datetime.datetime.now()
-                else:
-                    return mongo.get_cache(state.type, state)["txt"], last_cached_time
+                return DataProvider.__get_sms(state, last_request_time)
+
+    @staticmethod
+    def __get_sms(state, last_request_time):
+        last_cached_time = mongo.get_last_cached_time(state.type, state)
+        if (last_request_time is not None
+            and datetime.datetime.now() - last_request_time < datetime.timedelta(
+                seconds=SECONDS_TO_MANUAL_RECACHE)):
+            data = sql_server.request_sms(state)
+            mongo.cache(data, state.type, state)
+            return data, datetime.datetime.now()
+        else:
+            return mongo.get_cache(state.type, state)["txt"], last_cached_time

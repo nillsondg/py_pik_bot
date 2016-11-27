@@ -2,7 +2,6 @@ import pyodbc
 
 import config
 from sqlqueries import *
-from states import *
 
 
 def get_sql_config(server, database):
@@ -19,21 +18,21 @@ class SQL:
         return pyodbc.connect(get_sql_config(config.MSCRM_SERVER, config.MSCRM_DATABASE))
 
     def request_sales(self, state):
-        area = self.execute_sales(sales_requests[state])
+        area = self.__execute_sales(sales_requests[state])
         if area is None:
             return "Нет данных"
         return sales_strings[state].format(round(area, 2))
 
     def request_forecast(self, state):
-        s, ps = self.execute_forecast(forecast_requests[state])
+        s, ps = self.__execute_forecast(forecast_requests[state])
         if s is None:
             return "Нет данных"
         return forecast_strings[state].format(s=round(s, 2), ps=round(ps, 2))
 
     def request_sms(self, state):
-        return self.execute_sms(sms_requests[state])
+        return self.__execute_sms(sms_requests[state])
 
-    def execute_sales(self, sql):
+    def __execute_sales(self, sql):
         connection = self.get_pik_sales_local()
         cursor = connection.cursor()
         try:
@@ -48,7 +47,7 @@ class SQL:
             cursor.close()
             connection.close()
 
-    def execute_forecast(self, sql):
+    def __execute_forecast(self, sql):
         connection = self.get_pik_mscrm_dw()
         cursor = connection.cursor()
         try:
@@ -62,20 +61,22 @@ class SQL:
             cursor.close()
             connection.close()
 
-    def execute_sms(self, sql):
+    def __execute_sms(self, sql):
         connection = self.get_pik_sales_local()
         cursor = connection.cursor()
         try:
+            row = None
             cursor.execute(sql)
-            cursor.nextset()
-            cursor.nextset()
-            cursor.nextset()
-            cursor.nextset()
-            row = cursor.fetchone()
+            while cursor.nextset():
+                try:
+                    row = cursor.fetchone()
+                    break
+                except pyodbc.ProgrammingError as e:
+                    pass
             if row:
                 return row.txt
             else:
-                return None
+                return "Нет продаж"
         finally:
             cursor.close()
             connection.close()
