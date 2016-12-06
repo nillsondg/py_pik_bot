@@ -30,15 +30,23 @@ class SQL:
         return forecast_strings[state].format(s=round(s, 2), ps=round(ps, 2))
 
     def request_sms(self, state):
-        return self.__execute_sms(sms_requests[state])
+        txt = self.__execute_sms(sms_requests[state])
+        if txt is None:
+            return "Нет данных"
+        return txt
 
     def __execute_sales(self, sql):
         connection = self.get_pik_sales_local()
         cursor = connection.cursor()
         try:
+            row = None
             cursor.execute(sql)
-            cursor.nextset()  # особенность запроса
-            row = cursor.fetchone()
+            while cursor.nextset():
+                try:
+                    row = cursor.fetchone()
+                    break
+                except pyodbc.ProgrammingError:
+                    pass
             if row:
                 return row.areaSum
             else:
@@ -51,8 +59,14 @@ class SQL:
         connection = self.get_pik_mscrm_dw()
         cursor = connection.cursor()
         try:
+            row = None
             cursor.execute(sql)
-            row = cursor.fetchone()
+            while cursor.nextset():
+                try:
+                    row = cursor.fetchone()
+                    break
+                except pyodbc.ProgrammingError:
+                    pass
             if row:
                 return row.s, row.ps
             else:
@@ -71,12 +85,12 @@ class SQL:
                 try:
                     row = cursor.fetchone()
                     break
-                except pyodbc.ProgrammingError as e:
+                except pyodbc.ProgrammingError:
                     pass
             if row:
                 return row.txt
             else:
-                return "Нет продаж"
+                return None
         finally:
             cursor.close()
             connection.close()

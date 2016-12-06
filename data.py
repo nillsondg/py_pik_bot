@@ -10,13 +10,13 @@ SECONDS_TO_MANUAL_RECACHE = 5
 
 class DataProvider:
     @staticmethod
-    def request_with_cache(state, last_request_time):
-        if state.source == Source.morton:
-            if state.type == Type.sms:
-                return DataProvider.__get_sms(state, last_request_time)
-        else:
-            if state.type == Type.sms:
-                return DataProvider.__get_sms(state, last_request_time)
+    def request_with_cache(state, last_request_time=None):
+        if state.type == Type.sold:
+            return DataProvider.__get_sold(state, last_request_time)
+        elif state.type == Type.forecast:
+            return DataProvider.__get_forecast(state, last_request_time)
+        elif state.type == Type.sms:
+            return DataProvider.__get_sms(state, last_request_time)
 
     @staticmethod
     def __get_sms(state, last_request_time):
@@ -29,3 +29,13 @@ class DataProvider:
             return data, datetime.datetime.now()
         else:
             return mongo.get_cache(state.type, state)["txt"], last_cached_time
+
+    @staticmethod
+    def __get_sold(state, last_request_time):
+        last_cached_time = mongo.get_last_cached_time(state.type, state)
+        return mongo.get_cache(state.type, state)["txt"], last_cached_time
+
+    @staticmethod
+    def __get_forecast(state, last_request_time):
+        last_cached_time = mongo.get_last_cached_time(state.type, state)
+        return mongo.get_cache(state.type, state)["txt"], last_cached_time

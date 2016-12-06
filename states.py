@@ -16,13 +16,14 @@ class Source(Enum):
 
 
 class Type(Enum):
-    sold = "sold"
-    forecast = "forecast"
-    sms = "sms"
+    sold = "Продажи"
+    forecast = "Прогноз"
+    sms = "СМС"
 
 
 class State(Enum):
     none = None, None
+    auth = ("auth", "auth")
     pik_today = (Source.pik, Time.today)
     pik_yesterday = (Source.pik, Time.yesterday)
     pik_holidays = (Source.pik, Time.holidays)
@@ -50,7 +51,9 @@ class State(Enum):
 
     @property
     def description(self):
-        return self.source.value + " " + self.time.value
+        if self.source is not None and self.time is not None:
+            return self.source.value + " " + self.time.value
+        return "none"
 
     @staticmethod
     def get_state_by_description(description):
