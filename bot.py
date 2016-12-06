@@ -1,6 +1,5 @@
 import cherrypy
 import hashlib
-import copy
 
 import telebot
 import os
@@ -61,9 +60,6 @@ class User:
         user.username = mongo_user["username"]
         user.group = Group(mongo_user["group"])
         return user
-
-        # class Request:
-        # todo time type state
 
 
 class Session:
@@ -194,42 +190,33 @@ def is_user_in_sms_only_group(uid):
 @bot.message_handler(commands=[SOLD_CMD])
 @bot.message_handler(func=lambda msg: msg.text == Type.sold.value)
 def sold(msg):
-    if not is_user_in_full_info_group(msg.chat.id):
-        return
-    last_state = session.get_user_last_state(msg.chat.id)
-    if last_state != State.none and last_state.type != Type.sold:
-        state = copy.deepcopy(last_state)
-    else:
-        state = State.pik_today
-    state.type = Type.sold
+    # last_state = session.get_user_last_state(msg.chat.id)
+    # if last_state != State.none and last_state.type != Type.sold:
+    #     state = State((last_state.source, last_state.time, Type.sold))
+    # else:
+    state = State.pik_today_sold
     handle_cmd(msg, state)
 
 
 @bot.message_handler(commands=[FORECAST_CMD])
 @bot.message_handler(func=lambda msg: msg.text == Type.forecast.value)
 def forecast(msg):
-    if not is_user_in_full_info_group(msg.chat.id):
-        return
-    last_state = session.get_user_last_state(msg.chat.id)
-    if last_state != State.none and last_state.type != Type.forecast:
-        state = copy.deepcopy(last_state)
-    else:
-        state = State.pik_today
-    state.type = Type.forecast
+    # last_state = session.get_user_last_state(msg.chat.id)
+    # if last_state != State.none and last_state.type != Type.forecast:
+    #     state = State((last_state.source, last_state.time, Type.forecast))
+    # else:
+    state = State.pik_today_forecast
     handle_cmd(msg, state)
 
 
 @bot.message_handler(commands=[SMS_CMD])
 @bot.message_handler(func=lambda msg: msg.text == Type.sms.value)
 def sms(msg):
-    if not is_user_in_full_info_group(msg.chat.id):
-        return
-    last_state = session.get_user_last_state(msg.chat.id)
-    if last_state != State.none and last_state.type != Type.sms:
-        state = copy.deepcopy(last_state)
-    else:
-        state = State.pik_today
-    state.type = Type.sms
+    # last_state = session.get_user_last_state(msg.chat.id)
+    # if last_state != State.none and last_state.type != Type.sms:
+    #     state = State((last_state.source, last_state.time, Type.sms))
+    # else:
+    state = State.pik_today_sms
     handle_cmd(msg, state)
 
 
@@ -237,8 +224,7 @@ def sms(msg):
 def sms_pik(msg):
     if not is_user_in_sms_only_group(msg.chat.id):
         return
-    state = State.pik_today
-    state.type = Type.sms
+    state = State.pik_today_sms
     handle_cmd(msg, state, next_step=False)
 
 
@@ -246,16 +232,14 @@ def sms_pik(msg):
 def sms_morton(msg):
     if not is_user_in_sms_only_group(msg.chat.id):
         return
-    state = State.morton_today
-    state.type = Type.sms
+    state = State.morton_today_sms
     handle_cmd(msg, state, next_step=False)
 
 
 @bot.message_handler(func=lambda msg: session.get_current_state(msg.chat.id) == State.none)
 def get_message(msg):
-    if not is_user_in_full_info_group(msg.chat.id):
-        return
-    state = State.get_state_by_description(msg.text)
+    last_state = session.get_user_last_state(msg.chat.id)
+    state = State.get_state_by_description(msg.text, last_state.type)
     if state == State.none:
         print_keyboard(msg, "Неверный запрос")
         return
@@ -286,10 +270,11 @@ def process_request_and_return_state(msg, state, next_step):
     bot.send_chat_action(msg.chat.id, 'typing')
     result = "Произошла ошибка"
     last_state = session.get_user_last_state(msg.chat.id)
-    print(last_state.type.value)
+    if last_state.type is not None:
+        print(last_state.type.value)
     print(state.type.value)
     try:
-        if last_state == state and last_state.type == state.type:
+        if last_state == state:
             # result = DataProvider.request_with_cache(state, session.get_last_request_time(msg.chat.id))
             result = "recached"
         else:
@@ -319,11 +304,10 @@ def format_cache_time(date_time):
 def print_keyboard(msg, text, next_step=False):
     print("print_keyboard")
     user = session.get_user(msg.chat.id)
-    if user.group == Group.full_info:
-        if next_step:
-            print_step_keyboard(msg, text)
-        else:
-            print_full_info_keyboard(msg, text)
+    if next_step:
+        print_step_keyboard(msg, text)
+    elif user.group == Group.full_info:
+        print_full_info_keyboard(msg, text)
     elif user.group == Group.sms_only:
         print_sms_keyboard(msg, text)
     else:
@@ -353,9 +337,9 @@ def hide_keyboard(msg, text):
 def print_step_keyboard(msg, text):
     print("print_step_keyboard")
     user = session.get_user(msg.chat.id)
-    if user.group != Group.full_info:
-        print_keyboard(msg, text)
-        return
+    # if user.group != Group.full_info:
+    #     print_keyboard(msg, text)
+    #     return
     markup = types.ReplyKeyboardMarkup()
     next_states = StateTransitions.get_transition_for_state(user.state)
     if len(next_states) == 0:
