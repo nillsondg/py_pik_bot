@@ -29,13 +29,21 @@ sales_requests = {
 
 forecast_requests = {
     State.pik_today_forecast:
-        """declare @today date = cast(getdate() as date)
-            select
-              sum(Potential.new_areaunderopportunity) as s
-            , sum(iif(pic_probabilityName = \'Сделка запланирована и подтверждена\', Potential.new_areaunderopportunity, 0)) as ps
-            from Potential
-            where DateofQuery = @today
-              and EstimatedDateOfDeal = @today""",
+        '''
+          declare @today date = cast(getdate() as date)
+          select
+            sum(pt.new_areaunderopportunity) as s
+          , sum(iif(pt.pic_probabilityName = \'Сделка запланирована и подтверждена\', pt.new_areaunderopportunity, 0)) as ps
+
+          from Potential (nolock) as pt
+
+          inner join [sql1205pik\db6].pic_mscrm.dbo.pic_gkExtensionBase as gk
+            on gk.pic_name = pt.pic_gkidName
+
+          where pt.DateofQuery = @today
+            and pt.EstimatedDateOfDeal = @today
+            and gk.pic_mortonId is null
+        ''',
     State.pik_yesterday_forecast:
         '''
             declare @today date = dateadd(day, -1, cast(getdate() as date))

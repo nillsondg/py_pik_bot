@@ -18,24 +18,24 @@ class SQL:
         return pyodbc.connect(get_sql_config(config.MSCRM_SERVER, config.MSCRM_DATABASE))
 
     def request_sales(self, state):
-        area = self.__execute_sales(sales_requests[state])
+        area = self._execute_sales(sales_requests[state])
         if area is None:
             return "Нет данных"
         return sales_strings[state].format(round(area, 2))
 
     def request_forecast(self, state):
-        s, ps = self.__execute_forecast(forecast_requests[state])
+        s, ps = self._execute_forecast(forecast_requests[state])
         if s is None:
             return "Нет данных"
         return forecast_strings[state].format(s=round(s, 2), ps=round(ps, 2))
 
     def request_sms(self, state):
-        txt = self.__execute_sms(sms_requests[state])
+        txt = self._execute_sms(sms_requests[state])
         if txt is None:
             return "Нет данных"
         return txt
 
-    def __execute_sales(self, sql):
+    def _execute_sales(self, sql):
         connection = self.get_pik_sales_local()
         cursor = connection.cursor()
         try:
@@ -55,7 +55,7 @@ class SQL:
             cursor.close()
             connection.close()
 
-    def __execute_forecast(self, sql):
+    def _execute_forecast(self, sql):
         connection = self.get_pik_mscrm_dw()
         cursor = connection.cursor()
         try:
@@ -70,12 +70,12 @@ class SQL:
             if row:
                 return row.s, row.ps
             else:
-                return None
+                return None, None
         finally:
             cursor.close()
             connection.close()
 
-    def __execute_sms(self, sql):
+    def _execute_sms(self, sql):
         connection = self.get_pik_sales_local()
         cursor = connection.cursor()
         try:

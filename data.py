@@ -21,21 +21,39 @@ class DataProvider:
     @staticmethod
     def __get_sms(state, last_request_time):
         last_cached_time = mongo.get_last_cached_time(state.type, state)
-        if (last_request_time is not None
+        cache = mongo.get_cache(state.type, state)
+        if (cache is None or (last_request_time is not None
             and datetime.datetime.now() - last_request_time < datetime.timedelta(
-                seconds=SECONDS_TO_MANUAL_RECACHE)):
+                seconds=SECONDS_TO_MANUAL_RECACHE))):
             data = sql_server.request_sms(state)
             mongo.cache(data, state.type, state)
+            print("recached")
             return data, datetime.datetime.now()
         else:
+            print("from cache")
             return mongo.get_cache(state.type, state)["txt"], last_cached_time
 
     @staticmethod
     def __get_sold(state, last_request_time):
         last_cached_time = mongo.get_last_cached_time(state.type, state)
-        return mongo.get_cache(state.type, state)["txt"], last_cached_time
+        cache = mongo.get_cache(state.type, state)
+        if cache is None or datetime.datetime.now() - last_cached_time > datetime.timedelta(minutes=20):
+            data = sql_server.request_sales(state)
+            mongo.cache(data, state.type, state)
+            return data, datetime.datetime.now()
+        else:
+            print("from cache")
+            return cache["txt"], last_cached_time
 
     @staticmethod
     def __get_forecast(state, last_request_time):
         last_cached_time = mongo.get_last_cached_time(state.type, state)
-        return mongo.get_cache(state.type, state)["txt"], last_cached_time
+        cache = mongo.get_cache(state.type, state)
+        if cache is None or datetime.datetime.now() - last_cached_time > datetime.timedelta(minutes=20):
+            data = sql_server.request_forecast(state)
+            mongo.cache(data, state.type, state)
+            print("recached")
+            return data, datetime.datetime.now()
+        else:
+            print("from cache")
+            return cache["txt"], last_cached_time

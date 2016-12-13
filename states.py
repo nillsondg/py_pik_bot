@@ -88,8 +88,7 @@ class StateTransitions:
         State.pik_today_forecast: [State.moscow_today_forecast, State.regions_today_forecast,
                                    State.pik_yesterday_forecast,
                                    State.moscow_yesterday_forecast, State.regions_yesterday_forecast],
-        State.pik_today_sms: [State.moscow_today_sms, State.regions_today_sms, State.pik_yesterday_sms,
-                              State.moscow_yesterday_sms, State.regions_yesterday_sms, State.morton_today_sms],
+        State.pik_today_sms: [State.pik_yesterday_sms, State.morton_today_sms]
     }
 
     @staticmethod

@@ -65,12 +65,23 @@ class User:
 class Session:
     __users = dict()
 
-    def get_user(self, uid):
+    def get_user(self, uid, user_id):
         if uid not in self.__users:
-            if not mongo.check_user_id_in_db(uid):
+            if not mongo.check_user_id_in_db(user_id):
                 self.__users[uid] = User()
             else:
-                mongo_user = mongo.get_user_from_db(uid)
+                mongo_user = mongo.get_user_from_db(user_id)
+                self.__users[uid] = User.create_user_from_mongo(mongo_user)
+        return self.__users[uid]
+
+    def get_user_with_msg(self, msg):
+        uid = msg.chat.id
+        tg_user = msg.from_user
+        if uid not in self.__users:
+            if not mongo.check_user_id_in_db(tg_user.id):
+                self.__users[uid] = User.create_user_from_telegram(tg_user)
+            else:
+                mongo_user = mongo.get_user_from_db(tg_user.id)
                 self.__users[uid] = User.create_user_from_mongo(mongo_user)
         return self.__users[uid]
 
@@ -78,23 +89,23 @@ class Session:
         mongo.add_user_into_db(user)
         self.__users[uid] = user
 
-    def get_current_state(self, uid):
-        return self.get_user(uid).state
+    def get_current_state(self, uid, user_id):
+        return self.get_user(uid, user_id).state
 
-    def set_current_state(self, uid, state):
-        self.get_user(uid).state = state
+    def set_current_state(self, uid, user_id, state):
+        self.get_user(uid, user_id).state = state
 
-    def get_user_last_state(self, uid):
-        return self.get_user(uid).last_state
+    def get_user_last_state(self, uid, user_id):
+        return self.get_user(uid, user_id).last_state
 
-    def set_user_last_state(self, uid, state):
-        self.get_user(uid).last_state = state
+    def set_user_last_state(self, uid, user_id, state):
+        self.get_user(uid, user_id).last_state = state
 
-    def get_last_request_time(self, uid):
-        return self.get_user(uid).last_request_time
+    def get_last_request_time(self, uid, user_id):
+        return self.get_user(uid, user_id).last_request_time
 
-    def set_last_request_time_now(self, uid):
-        self.get_user(uid).last_request_time = datetime.datetime.now()
+    def set_last_request_time_now(self, uid, user_id):
+        self.get_user(uid, user_id).last_request_time = datetime.datetime.now()
 
 
 SOLD_CMD = "sold"
@@ -121,14 +132,14 @@ class WebhookServer(object):
 
 
 @bot.message_handler(commands=['start'])
-def send_welcome(message):
-    if not mongo.check_user_id_in_db(message.from_user.id):
-        session.set_current_state(message.chat.id, State.auth)
-        bot.send_message(message.chat.id, "Введите кодовое слово")
-        bot.register_next_step_handler(message, check_auth)
+def send_welcome(msg):
+    if not mongo.check_user_id_in_db(msg.from_user.id):
+        session.set_current_state(msg.chat.id, msg.from_user.id, State.auth)
+        bot.send_message(msg.chat.id, "Введите кодовое слово")
+        bot.register_next_step_handler(msg, check_auth)
     else:
-        mongo.update_user_auth(message.from_user)
-        print_keyboard(message, "Введите команду")
+        mongo.update_user_auth(msg.from_user)
+        print_keyboard(msg, "Введите команду")
 
 
 def check_auth(msg):
@@ -136,7 +147,7 @@ def check_auth(msg):
     if check_code_and_set_group(msg.text, user):
         mongo.add_user_into_db(user)
         print_keyboard(msg, "Добро пожаловать")
-        session.set_current_state(msg.chat.id, State.none)
+        session.set_current_state(msg.chat.id, msg.from_user.id, State.none)
     else:
         bot.reply_to(msg, "Неверно, попробуйте еще", disable_notification=True)
         bot.register_next_step_handler(msg, check_auth)
@@ -155,17 +166,19 @@ def refresh_keyboard(msg):
 @bot.message_handler(commands=['regroup'])
 def change_group(msg):
     print("change_group")
-    session.set_current_state(msg.chat.id, State.auth)
+    session.set_current_state(msg.chat.id, msg.from_user.id, State.auth)
     bot.send_message(msg.chat.id, "Введите кодовое слово")
     bot.register_next_step_handler(msg, check_regroup)
 
 
 def check_regroup(msg):
-    user = session.get_user(msg.chat.id)
+    user = session.get_user(msg.chat.id, msg.from_user.id)
     if check_code_and_set_group(msg.text, user):
         mongo.update_user_group(user)
         print_keyboard(msg, "Группа изменена")
-        session.set_current_state(msg.chat.id, State.none)
+    else:
+        bot.reply_to(msg, "Неверно, попробуйте еще", disable_notification=True)
+    session.set_current_state(msg.chat.id, msg.from_user.id, State.none)
 
 
 def check_code_and_set_group(code, user):
@@ -179,12 +192,12 @@ def check_code_and_set_group(code, user):
         return False
 
 
-def is_user_in_full_info_group(uid):
-    return session.get_user(uid).group == Group.full_info
+def is_user_in_full_info_group(uid, user_id):
+    return session.get_user(uid, user_id).group == Group.full_info
 
 
-def is_user_in_sms_only_group(uid):
-    return session.get_user(uid).group == Group.sms_only
+def is_user_in_sms_only_group(uid, user_id):
+    return session.get_user(uid, user_id).group == Group.sms_only
 
 
 @bot.message_handler(commands=[SOLD_CMD])
@@ -222,7 +235,7 @@ def sms(msg):
 
 @bot.message_handler(func=lambda msg: msg.text == Source.pik.value)
 def sms_pik(msg):
-    if not is_user_in_sms_only_group(msg.chat.id):
+    if not is_user_in_sms_only_group(msg.chat.id, msg.from_user.id):
         return
     state = State.pik_today_sms
     handle_cmd(msg, state, next_step=False)
@@ -230,15 +243,18 @@ def sms_pik(msg):
 
 @bot.message_handler(func=lambda msg: msg.text == Source.morton.value)
 def sms_morton(msg):
-    if not is_user_in_sms_only_group(msg.chat.id):
+    if not is_user_in_sms_only_group(msg.chat.id, msg.from_user.id):
         return
     state = State.morton_today_sms
     handle_cmd(msg, state, next_step=False)
 
 
-@bot.message_handler(func=lambda msg: session.get_current_state(msg.chat.id) == State.none)
+@bot.message_handler(func=lambda msg: session.get_current_state(msg.chat.id, msg.from_user.id) == State.none)
 def get_message(msg):
-    last_state = session.get_user_last_state(msg.chat.id)
+    if msg.text == "Назад":
+        ok(msg)
+        return
+    last_state = session.get_user_last_state(msg.chat.id, msg.from_user.id)
     state = State.get_state_by_description(msg.text, last_state.type)
     if state == State.none:
         print_keyboard(msg, "Неверный запрос")
@@ -248,43 +264,44 @@ def get_message(msg):
 
 def handle_cmd(msg, state, next_step=True):
     if not mongo.check_user_id_in_db(msg.from_user.id):
-        check_auth(msg)
+        session.set_current_state(msg.chat.id, msg.from_user.id, State.auth)
+        bot.send_message(msg.chat.id, "Вы не авторизованы. Введите кодовое слово")
+        bot.register_next_step_handler(msg, check_auth)
         return
 
-    current_state = session.get_current_state(msg.chat.id)
+    current_state = session.get_current_state(msg.chat.id, msg.from_user.id)
 
     # switch to prevent next request before first done
     if current_state != State.none:
         return
     else:
-        session.set_current_state(msg.chat.id, state)
+        session.set_current_state(msg.chat.id, msg.from_user.id, state)
 
-    print("current state = " + session.get_current_state(msg.chat.id).description)
+    print("current state = " + session.get_current_state(msg.chat.id, msg.from_user.id).description)
     result_state = process_request_and_return_state(msg, state, next_step)
-    session.set_current_state(msg.chat.id, State.none)
-    session.set_last_request_time_now(msg.chat.id)
-    session.set_user_last_state(msg.chat.id, result_state)
+    session.set_current_state(msg.chat.id, msg.from_user.id, State.none)
+    session.set_last_request_time_now(msg.chat.id, msg.from_user.id)
+    session.set_user_last_state(msg.chat.id, msg.from_user.id, result_state)
 
 
 def process_request_and_return_state(msg, state, next_step):
     bot.send_chat_action(msg.chat.id, 'typing')
     result = "Произошла ошибка"
-    last_state = session.get_user_last_state(msg.chat.id)
+    last_state = session.get_user_last_state(msg.chat.id, msg.from_user.id)
     if last_state.type is not None:
         print(last_state.type.value)
     print(state.type.value)
     try:
         if last_state == state:
-            # result = DataProvider.request_with_cache(state, session.get_last_request_time(msg.chat.id))
-            result = "recached"
+            result = DataProvider.request_with_cache(state, session.get_last_request_time(msg.chat.id, msg.from_user.id))
         else:
-            # result = DataProvider.request_with_cache(state)
-            result = "cached"
+            result = DataProvider.request_with_cache(state)
     except Exception as e:
         logging.error(e)
         print("ERROR!")
         print(e)
         state = State.none
+        next_step = False
 
     if isinstance(result, (list, tuple)):
         bot.send_message(msg.chat.id, format_cache_time(result[1]), disable_notification=True, parse_mode="Markdown")
@@ -303,7 +320,7 @@ def format_cache_time(date_time):
 
 def print_keyboard(msg, text, next_step=False):
     print("print_keyboard")
-    user = session.get_user(msg.chat.id)
+    user = session.get_user(msg.chat.id, msg.from_user.id)
     if next_step:
         print_step_keyboard(msg, text)
     elif user.group == Group.full_info:
@@ -336,18 +353,19 @@ def hide_keyboard(msg, text):
 
 def print_step_keyboard(msg, text):
     print("print_step_keyboard")
-    user = session.get_user(msg.chat.id)
+    user = session.get_user(msg.chat.id, msg.from_user.id)
     # if user.group != Group.full_info:
     #     print_keyboard(msg, text)
     #     return
     markup = types.ReplyKeyboardMarkup()
     next_states = StateTransitions.get_transition_for_state(user.state)
     if len(next_states) == 0:
-        session.set_current_state(msg.chat.id, State.none)
+        session.set_current_state(msg.chat.id, msg.from_user.id, State.none)
         print_keyboard(msg, text)
         return
     for next_state in next_states:
         markup.add(types.KeyboardButton(next_state.description))
+    markup.add(types.KeyboardButton("Назад"))
     bot.send_message(msg.chat.id, text, reply_markup=markup, disable_notification=True)
 
 
