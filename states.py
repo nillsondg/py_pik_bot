@@ -21,6 +21,7 @@ class Type(Enum):
     sms = "СМС"
 
 
+# request essence
 class State(Enum):
     none = None, None, None
     auth = None, None, "auth"

@@ -1,7 +1,8 @@
+import datetime
+
+import mongodb
 import sql
 from states import *
-import mongodb
-import datetime
 
 sql_server = sql.SQL()
 mongo = mongodb.MongoDB()
@@ -12,14 +13,14 @@ class DataProvider:
     @staticmethod
     def request_with_cache(state, last_request_time=None):
         if state.type == Type.sold:
-            return DataProvider.__get_sold(state, last_request_time)
+            return DataProvider._get_sold(state, last_request_time)
         elif state.type == Type.forecast:
-            return DataProvider.__get_forecast(state, last_request_time)
+            return DataProvider._get_forecast(state, last_request_time)
         elif state.type == Type.sms:
-            return DataProvider.__get_sms(state, last_request_time)
+            return DataProvider._get_sms(state, last_request_time)
 
     @staticmethod
-    def __get_sms(state, last_request_time):
+    def _get_sms(state, last_request_time):
         last_cached_time = mongo.get_last_cached_time(state.type, state)
         cache = mongo.get_cache(state.type, state)
         if (cache is None or (last_request_time is not None
@@ -34,7 +35,7 @@ class DataProvider:
             return mongo.get_cache(state.type, state)["txt"], last_cached_time
 
     @staticmethod
-    def __get_sold(state, last_request_time):
+    def _get_sold(state, last_request_time):
         last_cached_time = mongo.get_last_cached_time(state.type, state)
         cache = mongo.get_cache(state.type, state)
         if cache is None or datetime.datetime.now() - last_cached_time > datetime.timedelta(minutes=20):
@@ -46,7 +47,7 @@ class DataProvider:
             return cache["txt"], last_cached_time
 
     @staticmethod
-    def __get_forecast(state, last_request_time):
+    def _get_forecast(state, last_request_time):
         last_cached_time = mongo.get_last_cached_time(state.type, state)
         cache = mongo.get_cache(state.type, state)
         if cache is None or datetime.datetime.now() - last_cached_time > datetime.timedelta(minutes=20):
