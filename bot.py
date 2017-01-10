@@ -1,121 +1,15 @@
 import datetime
 import logging
-import os
-
-import cherrypy
-import telebot
 from telebot import types
 
+import server
+from session import Session, User, Group
 import auth
-import mongodb
-from config import TOKEN, ENV
 from data import DataProvider
 from states import *
 
-os.environ['NO_PROXY'] = 'https://api.telegram.org'
-WEBHOOK_HOST = 'tgbot.pik.ru'
-WEBHOOK_PORT = 443  # 443, 80, 88 or 8443 (port need to be 'open')
-WEBHOOK_LISTEN = '0.0.0.0'  # In some VPS you may need to put here the IP addr
-
-WEBHOOK_URL_BASE = "https://%s:%s" % (WEBHOOK_HOST, WEBHOOK_PORT)
-WEBHOOK_URL_PATH = "/%s/" % TOKEN
-
-print(WEBHOOK_URL_BASE)
-print(WEBHOOK_URL_PATH)
-logger = telebot.logger
-logging.basicConfig(filename="bot.log")
-logging.getLogger().addHandler(logging.StreamHandler())
-telebot.logger.setLevel(logging.INFO)
-bot = telebot.TeleBot(TOKEN)
-
-
-class Group(Enum):
-    sms_only = "sms_only"
-    full_info = "full_info"
-
-
-class User:
-    state = State.none
-    last_state = State.none
-    last_request_time = None
-    group = None
-
-    @staticmethod
-    def create_user_from_telegram(tg_user):
-        user = User()
-        user.id = tg_user.id
-        user.last_name = tg_user.last_name
-        user.first_name = tg_user.first_name
-        user.username = tg_user.username
-        return user
-
-    @staticmethod
-    def create_user_from_mongo(mongo_user):
-        user = User()
-        user.id = mongo_user["_id"]
-        user.last_name = mongo_user["last_name"]
-        user.first_name = mongo_user["first_name"]
-        user.username = mongo_user["username"]
-        user.group = Group(mongo_user["group"])
-        return user
-
-
-class Session:
-    _users = dict()
-
-    def get_user(self, uid, user_id):
-        if uid not in self._users:
-            if not mongo.check_user_id_in_db(user_id):
-                self._users[uid] = User()
-            else:
-                mongo_user = mongo.get_user_from_db(user_id)
-                self._users[uid] = User.create_user_from_mongo(mongo_user)
-        return self._users[uid]
-
-    def get_user_with_msg(self, msg):
-        uid = msg.chat.id
-        tg_user = msg.from_user
-        if uid not in self._users:
-            if not mongo.check_user_id_in_db(tg_user.id):
-                self._users[uid] = User.create_user_from_telegram(tg_user)
-            else:
-                mongo_user = mongo.get_user_from_db(tg_user.id)
-                self._users[uid] = User.create_user_from_mongo(mongo_user)
-        return self._users[uid]
-
-    def add_user(self, uid, user):
-        mongo.add_user_into_db(user)
-        self._users[uid] = user
-
-    def get_current_state(self, uid, user_id):
-        return self.get_user(uid, user_id).state
-
-    def set_current_state(self, uid, user_id, state):
-        self.get_user(uid, user_id).state = state
-
-    def get_user_last_state(self, uid, user_id):
-        return self.get_user(uid, user_id).last_state
-
-    def set_user_last_state(self, uid, user_id, state):
-        self.get_user(uid, user_id).last_state = state
-
-    def get_last_request_time(self, uid, user_id):
-        return self.get_user(uid, user_id).last_request_time
-
-    def set_last_request_time_now(self, uid, user_id):
-        self.get_user(uid, user_id).last_request_time = datetime.datetime.now()
-
-    @staticmethod
-    def is_user_in_full_info_group(uid, user_id):
-        return session.get_user(uid, user_id).group == Group.full_info
-
-    @staticmethod
-    def is_user_in_sms_only_group(uid, user_id):
-        return session.get_user(uid, user_id).group == Group.sms_only
-
-
 session = Session()
-mongo = mongodb.MongoDB()
+bot = server.init_bot()
 
 
 # request construct
@@ -127,12 +21,12 @@ class Bot:
     @staticmethod
     @bot.message_handler(commands=['start'])
     def send_welcome(msg):
-        if not mongo.check_user_id_in_db(msg.from_user.id):
+        if not session.check_user_id_in_db(msg.from_user.id):
             session.set_current_state(msg.chat.id, msg.from_user.id, State.auth)
             bot.send_message(msg.chat.id, "Введите кодовое слово")
             bot.register_next_step_handler(msg, Bot.check_auth)
         else:
-            mongo.update_user_auth(msg.from_user)
+            session.update_user_auth(msg.from_user)
             Bot.print_result_with_keyboard(msg, "Введите команду")
 
     @staticmethod
@@ -158,7 +52,7 @@ class Bot:
         user = User.create_user_from_telegram(msg.from_user)
         group = auth.check_code_and_return_group(msg.text)
         if group is not None:
-            mongo.add_user_into_db(user)
+            session.add_user(msg.chat.id, user)
             Bot.print_result_with_keyboard(msg, "Добро пожаловать")
             session.set_current_state(msg.chat.id, msg.from_user.id, State.none)
         else:
@@ -170,7 +64,7 @@ class Bot:
         user = session.get_user(msg.chat.id, msg.from_user.id)
         group = auth.check_code_and_return_group(msg.text)
         if group is not None:
-            mongo.update_user_group(user)
+            session.update_user_group(user)
             Bot.print_result_with_keyboard(msg, "Группа изменена")
         else:
             bot.reply_to(msg, "Неверно, попробуйте еще", disable_notification=True)
@@ -253,7 +147,7 @@ class Bot:
     @staticmethod
     def hide_keyboard(msg, text):
         print("hide_keyboard")
-        bot.send_message(msg.chat.id, text, reply_markup=types.ReplyKeyboardRemove, disable_notification=True)
+        bot.send_message(msg.chat.id, text, reply_markup=types.ReplyKeyboardHide, disable_notification=True)
 
     @staticmethod
     def print_step_keyboard(msg, text):
@@ -270,7 +164,7 @@ class Bot:
 class RequestProcessor:
     @staticmethod
     def handle_request(msg, state, next_step=True):
-        if not mongo.check_user_id_in_db(msg.from_user.id):
+        if not session.check_user_id_in_db(msg.from_user.id):
             session.set_current_state(msg.chat.id, msg.from_user.id, State.auth)
             bot.send_message(msg.chat.id, "Вы не авторизованы. Введите кодовое слово")
             bot.register_next_step_handler(msg, Bot.check_auth)
@@ -312,7 +206,7 @@ class RequestProcessor:
             next_step = False
 
         if isinstance(result, (list, tuple)):
-            bot.send_message(msg.chat.id, format_cache_time(result[1]), disable_notification=True,
+            bot.send_message(msg.chat.id, RequestProcessor.format_cache_time(result[1]), disable_notification=True,
                              parse_mode="Markdown")
             Bot.print_result_with_keyboard(msg, result[0], next_step=next_step)
         else:
@@ -320,11 +214,11 @@ class RequestProcessor:
 
         return state
 
-
-def format_cache_time(date_time):
-    # cause server incorrect time
-    date_time -= datetime.timedelta(hours=1)
-    return "_@" + date_time.strftime("%H:%M:%S") + "_"
+    @staticmethod
+    def format_cache_time(date_time):
+        # cause server incorrect time
+        date_time -= datetime.timedelta(hours=1)
+        return "_@" + date_time.strftime("%H:%M:%S") + "_"
 
 
 class KeyboardCreator:
@@ -353,38 +247,4 @@ class KeyboardCreator:
         return markup
 
 
-# only used for console output now
-def listener(messages):
-    for m in messages:
-        if m.content_type == 'text':
-            # print the sent message to the console
-            print(str(m.chat.first_name) + " [" + str(m.chat.id) + "]: " + m.text)
-
-
-# WebhookServer, process webhook calls
-class WebhookServer(object):
-    @cherrypy.expose
-    def index(self):
-        if 'content-length' in cherrypy.request.headers and \
-                        'content-type' in cherrypy.request.headers and \
-                        cherrypy.request.headers['content-type'] == 'application/json':
-            length = int(cherrypy.request.headers['content-length'])
-            json_string = cherrypy.request.body.read(length).decode("utf-8")
-            update = telebot.types.Update.de_json(json_string)
-            bot.process_new_updates([update])
-            return ''
-        else:
-            raise cherrypy.HTTPError(403)
-
-bot.set_update_listener(listener)
-bot.remove_webhook()
-if ENV == "prod":
-    bot.set_webhook(url=WEBHOOK_URL_BASE + WEBHOOK_URL_PATH)
-
-    cherrypy.config.update({
-        'server.socket_host': WEBHOOK_LISTEN,
-        'server.socket_port': WEBHOOK_PORT
-    })
-    cherrypy.quickstart(WebhookServer(), WEBHOOK_URL_PATH, {'/': {}})
-else:
-    bot.polling()
+server.start_bot()
