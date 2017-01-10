@@ -2,7 +2,6 @@ import telebot
 import cherrypy
 import os
 import logging
-import datetime
 from config import TOKEN, ENV
 
 os.environ['NO_PROXY'] = 'https://api.telegram.org'
@@ -32,14 +31,18 @@ def listener(messages):
         if m.content_type == 'text':
             # print the sent message to the console
             print(str(m.chat.first_name) + " [" + str(m.chat.id) + "]: " + m.text)
-            logging.info(datetime.datetime.now().strftime("%d-%m %H:%M:%S") + " " + str(m.chat.first_name) + " [" + str(
-                m.chat.id) + "]: " + m.text)
+            logging.info(str(m.chat.first_name) + " (" + str(m.chat.id) + "): " + m.text)
 
 
 def _init_logger():
-    logging.basicConfig(filename="bot.log", format='[%(asctime)s] %(message)s')
+    # todo record msgs with info level cause parent handler =(
+    telebot.logger.setLevel(logging.WARNING)
+    if ENV == "prod":
+        level = logging.INFO
+    else:
+        level = logging.DEBUG
+    logging.basicConfig(filename="bot.log", format='[%(asctime)s] %(message)s', level=level)
     logging.getLogger().addHandler(logging.StreamHandler())
-    telebot.logger.setLevel(logging.INFO)
 
 
 def start_bot():
