@@ -19,6 +19,7 @@ class Type(Enum):
     sold = "Продажи"
     forecast = "Прогноз"
     sms = "СМС"
+    pf = "План-Факт"
 
 
 # request essence
@@ -47,9 +48,8 @@ class State(Enum):
     regions_yesterday_sms = Source.regions, Time.yesterday, Type.sms
     morton_today_sms = Source.morton, Time.today, Type.sms
 
-    # morton_yesterday = (Source.morton, Time.yesterday)
-    # morton_holidays = (Source.morton, Time.holidays)
-    # morton_month = (Source.morton, Time.month)
+    pik_month_pf = Source.pik, Time.month, Type.pf
+    morton_month_pf = Source.morton, Time.month, Type.pf
 
     def __init__(self, source, time, type):
         self.source = source

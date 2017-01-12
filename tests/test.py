@@ -8,7 +8,7 @@ import files
 class TestFiles(unittest.TestCase):
     def test_construct_url(self):
         state = State.pik_today_sold
-        url = files.construct_url(state)
+        url = files.generate_url(state)
         current_date = date.today().strftime("%Y-%m-%d")
         first_date_of_month = date(date.today().year, date.today().month, 1).strftime("%Y-%m-%d")
         print(url)
