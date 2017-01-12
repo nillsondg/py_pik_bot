@@ -17,6 +17,7 @@ class Bot:
     SOLD_CMD = "sold"
     FORECAST_CMD = "forecast"
     SMS_CMD = "sms"
+    PF_CMD = "pf"
 
     @staticmethod
     @bot.message_handler(commands=['start'])
@@ -111,6 +112,12 @@ class Bot:
         if not session.is_user_in_sms_only_group(msg.chat.id, msg.from_user.id):
             return
         state = State.morton_today_sms
+        RequestProcessor.handle_request(msg, state, next_step=False)
+
+    @staticmethod
+    @bot.message_handler(commands=[PF_CMD])
+    def pf_pik(msg):
+        state = State.pik_month_pf
         RequestProcessor.handle_request(msg, state, next_step=False)
 
     @staticmethod
@@ -224,7 +231,16 @@ class RequestProcessor:
         if isinstance(result, (list, tuple)):
             bot.send_message(msg.chat.id, RequestProcessor.format_cache_time(result[1]), disable_notification=True,
                              parse_mode="Markdown")
-            Bot.print_result_with_keyboard(msg, result[0], next_step=next_step)
+            # file upload
+            if state.type == Type.pf:
+                if result[0]["file_id"] is None:
+                    with open(result[0]["file_name"], 'rb') as file:
+                        result = bot.send_document(msg.chat.id, file)
+                        DataProvider.update_file_id(state, file_id=result.document.file_id)
+                else:
+                    bot.send_document(msg.chat.id, result[0]["file_id"])
+            else:
+                Bot.print_result_with_keyboard(msg, result[0], next_step=next_step)
         else:
             Bot.print_result_with_keyboard(msg, result, next_step=next_step)
 
@@ -235,6 +251,12 @@ class RequestProcessor:
         # cause server incorrect time
         date_time -= datetime.timedelta(hours=1)
         return "_@" + date_time.strftime("%H:%M:%S") + "_"
+
+
+class ResultPrinter:
+    @staticmethod
+    def print_result():
+        pass
 
 
 class KeyboardCreator:
