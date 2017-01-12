@@ -4,6 +4,7 @@ from states import *
 from datetime import datetime, timedelta
 
 
+# DEPRECATED
 class Morton:
     host = 'https://webapi.morton.ru'
 
