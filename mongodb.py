@@ -32,14 +32,14 @@ class MongoDB:
     def update_user_group(self, user):
         self.user_db.users.update({'_id': user.id}, {"$set": {'group': user.group.value}})
 
-    def get_last_cached_time(self, cache_type, state):
-        result = self.cache_db[cache_type.value].find_one({"_id": state.description})
+    def get_last_cached_time(self, state):
+        result = self.cache_db[state.type.value].find_one({"_id": state.description})
         if result is None:
             return None
         return result["cached_at"]
 
-    def cache(self, data, cache_type, state):
-        self._cache(data, cache_type.value, state.description)
+    def cache(self, data, state):
+        self._cache(data, state.type.value, state.description)
 
     def _cache(self, data, cache_type, cache_name):
         self.cache_db[cache_type].update_one({
@@ -50,6 +50,29 @@ class MongoDB:
             "requested_at": datetime.datetime.now()
         }}, upsert=True)
         logging.info(datetime.datetime.now().strftime("%d-%m %H:%M:%S") + " cached " + cache_name)
+
+    def cache_file_info(self, file_name, state):
+        cache_name = state.description
+        cache_type = state.type.value
+        self.cache_db[cache_type].update_one({
+            "_id": cache_name
+        }, {"$set": {
+            "file_name": file_name,
+            "file_id": None,
+            "cached_at": datetime.datetime.now(),
+            "requested_at": datetime.datetime.now()
+        }}, upsert=True)
+        logging.info(datetime.datetime.now().strftime("%d-%m %H:%M:%S") + " cached " + cache_name)
+
+    def update_file_id(self, file_id, state):
+        cache_name = state.description
+        cache_type = state.type.value
+        self.cache_db[cache_type].update({'_id': cache_name}, {"$set": {'file_id': file_id}})
+
+    def update_file_name(self, file_name, state):
+        cache_name = state.description
+        cache_type = state.type.value
+        self.cache_db[cache_type].update({'_id': cache_name}, {"$set": {'file_name': file_name}})
 
     def get_cache(self, cache_type, state):
         return self._get_cache(cache_type.value, state.description)
