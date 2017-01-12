@@ -106,11 +106,23 @@ forecast_requests = {
 }
 
 sms_requests = {
+    State.all_today_sms:
+        '''
+          exec tgbot_sms_all
+          select
+            cast(coalesce(c1.text, iif(datepart(hh, getdate()) > 6, null, c2.text), 'Нет продаж') as varchar(max)) as txt
+          from tgbot_sms_cache as c1
+          inner join tgbot_sms_cache as c2
+            on c2.company is null
+            and c2.period = 1
+          where c1.period = 0
+            and c1.company is null
+        ''',
     State.pik_today_sms:
         '''
           exec tgbot_sms_pik
           select
-            cast(coalesce(c1.text, c2.text, 'Нет продаж') as varchar(max)) as txt
+            cast(coalesce(c1.text, iif(datepart(hh, getdate()) > 6, null, c2.text), 'Нет продаж') as varchar(max)) as txt
           from tgbot_sms_cache as c1
           inner join tgbot_sms_cache as c2
             on c2.company = c1.company
@@ -143,7 +155,7 @@ sms_requests = {
         '''
           exec tgbot_sms_morton
           select
-            cast(coalesce(c1.text, c2.text, 'Нет продаж') as varchar(max)) as txt
+            cast(coalesce(c1.text, iif(datepart(hh, getdate()) > 6, null, c2.text), 'Нет продаж') as varchar(max)) as txt
           from tgbot_sms_cache as c1
           inner join tgbot_sms_cache as c2
             on c2.company = c1.company

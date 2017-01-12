@@ -27,7 +27,7 @@ class Bot:
             bot.register_next_step_handler(msg, Bot.check_auth)
         else:
             session.update_user_auth(msg.from_user)
-            Bot.print_result_with_keyboard(msg, "Введите команду")
+            Bot.print_result_with_keyboard(msg, "Выберите команду")
 
     @staticmethod
     @bot.message_handler(commands=['ok'])
@@ -92,6 +92,12 @@ class Bot:
         RequestProcessor.handle_request(msg, state)
 
     @staticmethod
+    @bot.message_handler(func=lambda msg: msg.text == Source.all.value)
+    def sms_all(msg):
+        state = State.all_today_sms
+        RequestProcessor.handle_request(msg, state)
+
+    @staticmethod
     @bot.message_handler(func=lambda msg: msg.text == Source.pik.value)
     def sms_pik(msg):
         if not session.is_user_in_sms_only_group(msg.chat.id, msg.from_user.id):
@@ -113,6 +119,16 @@ class Bot:
         if msg.text == "Назад":
             Bot.ok(msg)
             return
+        elif 'sold' in msg.text.lower():
+            Bot.sold(msg)
+            return
+        elif 'forecast' in msg.text.lower():
+            Bot.forecast(msg)
+            return
+        elif 'sms' in msg.text.lower():
+            Bot.sms_all(msg)
+            return
+
         last_state = session.get_user_last_state(msg.chat.id, msg.from_user.id)
         state = State.get_state_by_description(msg.text, last_state.type)
         if state == State.none:
@@ -235,8 +251,9 @@ class KeyboardCreator:
 
     @staticmethod
     def sms_keyboard():
-        markup = types.ReplyKeyboardMarkup(row_width=2, resize_keyboard=True, one_time_keyboard=False)
-        markup.row(types.KeyboardButton(Source.pik.value), types.KeyboardButton(Source.morton.value))
+        markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True, one_time_keyboard=False)
+        markup.row(types.KeyboardButton(Source.pik.value), types.KeyboardButton(Source.morton.value),
+                   types.KeyboardButton(Source.all.value))
         return markup
 
     @staticmethod

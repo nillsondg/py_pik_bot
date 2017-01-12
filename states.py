@@ -13,6 +13,7 @@ class Source(Enum):
     moscow = "Москва"
     regions = "Регионы"
     morton = "Мортон"
+    all = "Все"
 
 
 class Type(Enum):
@@ -39,6 +40,7 @@ class State(Enum):
     regions_today_forecast = Source.regions, Time.today, Type.forecast
     regions_yesterday_forecast = Source.regions, Time.yesterday, Type.forecast
 
+    all_today_sms = Source.all, Time.today, Type.sms
     pik_today_sms = Source.pik, Time.today, Type.sms
     pik_yesterday_sms = Source.pik, Time.yesterday, Type.sms
     moscow_today_sms = Source.moscow, Time.today, Type.sms
@@ -84,11 +86,13 @@ class StateTransitions:
         State.none: [],
 
         State.pik_today_sold: [State.moscow_today_sold, State.regions_today_sold, State.pik_yesterday_sold,
-                               State.moscow_yesterday_sold, State.regions_yesterday_sold],
+                               # State.moscow_yesterday_sold, State.regions_yesterday_sold
+                               ],
 
         State.pik_today_forecast: [State.moscow_today_forecast, State.regions_today_forecast,
-                                   State.pik_yesterday_forecast,
-                                   State.moscow_yesterday_forecast, State.regions_yesterday_forecast],
+                                   # State.pik_yesterday_forecast,
+                                   # State.moscow_yesterday_forecast, State.regions_yesterday_forecast
+                                   ],
         State.pik_today_sms: [State.pik_yesterday_sms, State.morton_today_sms]
     }
 
