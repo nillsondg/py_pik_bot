@@ -75,50 +75,74 @@ class Bot:
     @bot.message_handler(commands=[SOLD_CMD])
     @bot.message_handler(func=lambda msg: msg.text == Type.sold.value)
     def sold(msg):
-        state = State.pik_today_sold
-        RequestProcessor.handle_request(msg, state)
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.SOLD_CMD):
+            state = State.pik_today_sold
+            RequestProcessor.handle_request(msg, state)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(commands=[FORECAST_CMD])
     @bot.message_handler(func=lambda msg: msg.text == Type.forecast.value)
     def forecast(msg):
-        state = State.pik_today_forecast
-        RequestProcessor.handle_request(msg, state)
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.FORECAST_CMD):
+            state = State.pik_today_forecast
+            RequestProcessor.handle_request(msg, state)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(commands=[SMS_CMD])
     @bot.message_handler(func=lambda msg: msg.text == Type.sms.value)
     def sms(msg):
-        state = State.pik_today_sms
-        RequestProcessor.handle_request(msg, state)
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.SMS_CMD):
+            state = State.pik_today_sms
+            RequestProcessor.handle_request(msg, state)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(func=lambda msg: msg.text == Source.all.value)
     def sms_all(msg):
-        state = State.all_today_sms
-        RequestProcessor.handle_request(msg, state)
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.SMS_CMD):
+            state = State.all_today_sms
+            RequestProcessor.handle_request(msg, state)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(func=lambda msg: msg.text == Source.pik.value)
     def sms_pik(msg):
-        if not session.is_user_in_sms_only_group(msg.chat.id, msg.from_user.id):
-            return
-        state = State.pik_today_sms
-        RequestProcessor.handle_request(msg, state, next_step=False)
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.SMS_CMD):
+            state = State.pik_today_sms
+            RequestProcessor.handle_request(msg, state, next_step=False)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(func=lambda msg: msg.text == Source.morton.value)
     def sms_morton(msg):
-        if not session.is_user_in_sms_only_group(msg.chat.id, msg.from_user.id):
-            return
-        state = State.morton_today_sms
-        RequestProcessor.handle_request(msg, state, next_step=False)
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.SMS_CMD):
+            state = State.morton_today_sms
+            RequestProcessor.handle_request(msg, state, next_step=False)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(commands=[PF_CMD])
     def pf_pik(msg):
-        state = State.pik_month_pf
-        RequestProcessor.handle_request(msg, state, next_step=False)
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.PF_CMD):
+            state = State.pik_month_pf
+            RequestProcessor.handle_request(msg, state, next_step=False)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(func=lambda msg: session.get_current_state(msg.chat.id, msg.from_user.id) == State.none)
@@ -149,12 +173,11 @@ class Bot:
         user = session.get_user(msg.chat.id, msg.from_user.id)
         if next_step:
             Bot.print_step_keyboard(msg, text)
-        elif user.group == Group.full_info:
-            Bot.print_full_info_keyboard(msg, text)
-        elif user.group == Group.sms_only:
+        elif user.group == Group.users:
             Bot.print_sms_keyboard(msg, text)
         else:
-            Bot.hide_keyboard(msg, text)
+            Bot.print_sms_keyboard(msg, text)
+            # Bot.hide_keyboard(msg, text)
 
     @staticmethod
     def print_sms_keyboard(msg, text):
@@ -182,6 +205,10 @@ class Bot:
             Bot.print_result_with_keyboard(msg, text)
             return
         bot.send_message(msg.chat.id, text, reply_markup=markup, disable_notification=True)
+
+    @staticmethod
+    def print_error_permission(msg):
+        bot.send_message(msg.chat.id, "У вас недостаточно прав для данного запроса", disable_notification=True)
 
 
 class RequestProcessor:

@@ -1,0 +1,20 @@
+{
+  "admins": [
+    "sold",
+    "forecast",
+    "sms",
+    "pf"
+  ],
+  "owners": [
+    "sold",
+    "forecast",
+    "sms",
+    "pf"
+  ],
+  "users": [
+    "sold",
+    "forecast",
+    "sms",
+    "pf"
+  ]
+}

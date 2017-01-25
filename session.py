@@ -1,14 +1,20 @@
 import mongodb
 import datetime
+import json
+from collections import OrderedDict
 from enum import Enum
 from states import State
 
 mongo = mongodb.MongoDB()
 
+with open('rights.json') as f:
+    rights = json.load(f, object_pairs_hook=OrderedDict)
+
 
 class Group(Enum):
-    sms_only = "sms_only"
-    full_info = "full_info"
+    users = "users"
+    admins = "admins"
+    owners = "owners"
 
 
 class User:
@@ -92,8 +98,16 @@ class Session:
     def check_user_id_in_db(self, user_id):
         return mongo.check_user_id_in_db(user_id)
 
-    def is_user_in_full_info_group(self, uid, user_id):
-        return self.get_user(uid, user_id).group == Group.full_info
+    def is_user_in_admins_group(self, uid, user_id):
+        return self.get_user(uid, user_id).group == Group.admins
 
-    def is_user_in_sms_only_group(self, uid, user_id):
-        return self.get_user(uid, user_id).group == Group.sms_only
+    def is_user_in_users_group(self, uid, user_id):
+        return self.get_user(uid, user_id).group == Group.users
+
+    def check_rights(self, user, cmd):
+        cmd_list = Session._get_cmd_list(user.group)
+        return cmd in cmd_list
+
+    @staticmethod
+    def _get_cmd_list(user_group):
+        return rights[user_group.value]
