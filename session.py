@@ -128,6 +128,7 @@ class Session:
         return self._bcasts.pop(uid)
 
     def check_rights(self, user, cmd):
+        # if user.group
         cmd_list = Session._get_cmd_list(user.group)
         return cmd in cmd_list
 

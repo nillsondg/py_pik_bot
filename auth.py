@@ -1,6 +1,6 @@
 import hashlib
 
-from bot import Group
+from session import Group
 from config import full_group_hex, sms_only_hex
 
 
