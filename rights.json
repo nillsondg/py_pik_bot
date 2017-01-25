@@ -4,7 +4,8 @@
     "forecast",
     "sms",
     "pf",
-    "bcast"
+    "bcast",
+    "user_list"
   ],
   "owners": [
     "sold",

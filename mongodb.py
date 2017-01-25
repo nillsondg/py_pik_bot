@@ -29,6 +29,9 @@ class MongoDB:
     def get_user_for_group_from_db(self, group_name):
         return self.user_db.users.find({"group": group_name})
 
+    def get_users(self):
+        return self.user_db.users.find()
+
     def update_user_auth(self, user):
         self.user_db.users.update({'_id': user.id}, {"$set": {'last_auth': datetime.datetime.now()}})
 

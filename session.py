@@ -112,10 +112,15 @@ class Session:
         return self.get_user(uid, user_id).group == Group.users
 
     def get_users_for_group(self, group_name):
-        raw_users = mongo.get_user_for_group_from_db(group_name)
+        return self.convert_mongo_users(mongo.get_user_for_group_from_db(group_name))
+
+    def get_users(self):
+        return self.convert_mongo_users(mongo.get_users())
+
+    def convert_mongo_users(self, mongo_users):
         users = []
-        for raw_user in raw_users:
-            users.append(User.create_user_from_mongo(raw_user))
+        for mongo_user in mongo_users:
+            users.append(User.create_user_from_mongo(mongo_user))
         return users
 
     def check_group_exist(self, group_name):

@@ -19,6 +19,7 @@ class Bot:
     SMS_CMD = "sms"
     PF_CMD = "pf"
     BCAST_CMD = "bcast"
+    USER_LIST_CMD = "user_list"
 
     @staticmethod
     @bot.message_handler(commands=['start'])
@@ -211,6 +212,22 @@ class Bot:
             Bot.print_result_with_keyboard(msg, "Отправлено")
         else:
             Bot.print_result_with_keyboard(msg, "Отменено")
+
+    @staticmethod
+    @bot.message_handler(commands=[USER_LIST_CMD])
+    def user_list(msg):
+        if not Bot.check_user_authed_and_start_auth(msg):
+            return
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.USER_LIST_CMD):
+            users = session.get_users()
+            user_list = "id\tusername\tlast_name\tfirst_name\n"
+            for bot_user in users:
+                user_list += '\t'.join(
+                    [str(bot_user.id), str(bot_user.username), str(bot_user.last_name), bot_user.first_name]) + '\n'
+            bot.send_message(msg.chat.id, user_list)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(func=lambda msg: session.get_current_state(msg.chat.id, msg.from_user.id) == State.none)

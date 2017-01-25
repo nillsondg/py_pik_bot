@@ -1,6 +1,6 @@
 import pymongo
 client = pymongo.MongoClient()
-users_db = client.users
+users_db = client["test-users"]
 users = users_db.users.find()
 file = open("UserDB.txt", "w")
 header = "id\tusername\tlast_name\tfirst_name\n"
