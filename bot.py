@@ -18,6 +18,7 @@ class Bot:
     FORECAST_CMD = "forecast"
     SMS_CMD = "sms"
     PF_CMD = "pf"
+    BCAST_CMD = "bcast"
 
     @staticmethod
     @bot.message_handler(commands=['start'])
@@ -143,6 +144,46 @@ class Bot:
             RequestProcessor.handle_request(msg, state, next_step=False)
         else:
             Bot.print_error_permission(msg)
+
+    @staticmethod
+    @bot.message_handler(commands=[BCAST_CMD])
+    def broadcast(msg):
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.BCAST_CMD):
+            txt = msg.text.split()
+            try:
+                group_name = txt[1]
+            except IndexError:
+                bot.send_message(msg.chat.id, "Не указано имя группы после команды", disable_notification=True)
+                return
+            text = " ".join(txt[2:])
+            session.add_bcast_msg(msg.chat.id, group_name, text)
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+            markup.row(types.KeyboardButton("Да"), types.KeyboardButton("Нет"))
+            bot.send_message(msg.chat.id, "Отправить сообщение группе {group_name} с текстом: \"{text}\"?".format(
+                group_name=group_name, text=text), reply_markup=markup, disable_notification=True)
+
+            session.set_current_state(msg.chat.id, msg.from_user.id, None)
+            bot.register_next_step_handler(msg, Bot.check_broadcast_msg)
+
+        else:
+            Bot.print_error_permission(msg)
+
+    @staticmethod
+    def check_broadcast_msg(msg):
+        session.set_current_state(msg.chat.id, msg.from_user.id, State.none)
+        user_choice = msg.text
+        if user_choice.lower() == "да":
+            bcast = session.pop_bcast_msg(msg.chat.id)
+            if not session.check_group_exist(bcast.group):
+                Bot.print_result_with_keyboard(msg, "Нет группы " + bcast.group)
+                return
+            users = session.get_users_for_group(bcast.group)
+            for user in users:
+                bot.send_message(user.id, bcast.text, disable_notification=True)
+            Bot.print_result_with_keyboard(msg, "Отправлено")
+        else:
+            Bot.print_result_with_keyboard(msg, "Отменено")
 
     @staticmethod
     @bot.message_handler(func=lambda msg: session.get_current_state(msg.chat.id, msg.from_user.id) == State.none)

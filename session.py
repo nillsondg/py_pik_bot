@@ -17,6 +17,12 @@ class Group(Enum):
     owners = "owners"
 
 
+class Broadcast:
+    def __init__(self, group, text):
+        self.group = group
+        self.text = text
+
+
 class User:
     state = State.none
     last_state = State.none
@@ -46,6 +52,7 @@ class User:
 # todo name problem
 class Session:
     _users = dict()
+    _bcasts = dict()
 
     def get_user(self, uid, user_id):
         if uid not in self._users:
@@ -103,6 +110,22 @@ class Session:
 
     def is_user_in_users_group(self, uid, user_id):
         return self.get_user(uid, user_id).group == Group.users
+
+    def get_users_for_group(self, group_name):
+        raw_users = mongo.get_user_for_group_from_db(group_name)
+        users = []
+        for raw_user in raw_users:
+            users.append(User.create_user_from_mongo(raw_user))
+        return users
+
+    def check_group_exist(self, group_name):
+        return group_name in [e.value for e in Group]
+
+    def add_bcast_msg(self, uid, group_name, text):
+        self._bcasts[uid] = Broadcast(group_name, text)
+
+    def pop_bcast_msg(self, uid):
+        return self._bcasts.pop(uid)
 
     def check_rights(self, user, cmd):
         cmd_list = Session._get_cmd_list(user.group)
