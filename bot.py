@@ -357,8 +357,6 @@ class RequestProcessor:
 
     @staticmethod
     def format_cache_time(date_time):
-        # cause server incorrect time
-        date_time -= datetime.timedelta(hours=1)
         return "_@" + date_time.strftime("%H:%M:%S") + "_"
 
 

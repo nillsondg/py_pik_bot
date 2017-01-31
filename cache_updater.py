@@ -7,6 +7,9 @@ import logging
 import asyncio
 import datetime
 import files
+import os
+
+os.environ['NO_PROXY'] = 'http://qgis01pik.main.picompany.ru'
 
 logging.basicConfig(filename="cache_updater.log", level=logging.INFO)
 logging.getLogger().addHandler(logging.StreamHandler())
@@ -16,14 +19,19 @@ mongo = mongodb.MongoDB()
 s = sched.scheduler(time.time, time.sleep)
 s2 = sched.scheduler(time.time, time.sleep)
 CACHE_TTL_MLS = 15 * 60
-CACHE_FILES_TTL_MLS = 30 * 60
+CACHE_FILES_TTL_MLS = 5 * 60
 
 
 @asyncio.coroutine
 def recaching():
     logging.info(datetime.datetime.now().strftime("%d-%m %H:%M:%S") + " start caching ")
-    for state in State:
-        yield from recaching2(state)
+    while True:
+        yield from asyncio.sleep(CACHE_FILES_TTL_MLS)
+        yield from recaching2(State.all_today_sms)
+        yield from recaching2(State.pik_today_sms)
+        yield from recaching2(State.morton_today_sms)
+        yield from recaching2(State.pik_month_pf)
+        print('cached')
 
 
 @asyncio.coroutine
@@ -39,6 +47,8 @@ def recaching2(state):
         elif state.type == Type.forecast:
             data = sql_server.request_forecast(state)
             mongo.cache(data, state)
+        elif state.type == Type.pf:
+            recache_files()
     except Exception as e:
         logging.error(e)
         print("Error!")
@@ -47,12 +57,8 @@ def recaching2(state):
 
 def recache(sc):
     event_loop = asyncio.get_event_loop()
-    try:
-        event_loop.run_until_complete(recaching())
-    finally:
-        event_loop.close()
-    recache_files()
-    s.enter(CACHE_TTL_MLS, 1, recache, (sc,))
+    event_loop.create_task(recaching())
+    event_loop.run_forever()
 
 
 def recache_files():
