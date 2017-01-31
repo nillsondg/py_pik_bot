@@ -3,7 +3,7 @@ import logging
 from telebot import types
 
 import server
-from session import Session, User, Group
+from session import Session, User, Group, Broadcast
 import auth
 from data import DataProvider
 from states import *
@@ -18,6 +18,8 @@ class Bot:
     FORECAST_CMD = "forecast"
     SMS_CMD = "sms"
     PF_CMD = "pf"
+    BCAST_CMD = "bcast"
+    USER_LIST_CMD = "user_list"
 
     @staticmethod
     @bot.message_handler(commands=['start'])
@@ -52,10 +54,14 @@ class Bot:
     def check_auth(msg):
         user = User.create_user_from_telegram(msg.from_user)
         group = auth.check_code_and_return_group(msg.text)
+        user.group = group
         if group is not None:
             session.add_user(msg.chat.id, user)
             Bot.print_result_with_keyboard(msg, "Добро пожаловать")
             session.set_current_state(msg.chat.id, msg.from_user.id, State.none)
+            bcast = Broadcast(Group.admins.value,
+                              "Новый пользователь " + ' '.join(filter(None, (user.last_name, user.first_name))))
+            Broadcaster.broadcast(bcast)
         else:
             bot.reply_to(msg, "Неверно, попробуйте еще", disable_notification=True)
             bot.register_next_step_handler(msg, Bot.check_auth)
@@ -72,57 +78,162 @@ class Bot:
         session.set_current_state(msg.chat.id, msg.from_user.id, State.none)
 
     @staticmethod
+    def check_user_authed_and_start_auth(msg):
+        if not session.check_user_id_in_db(msg.from_user.id):
+            session.set_current_state(msg.chat.id, msg.from_user.id, State.auth)
+            bot.send_message(msg.chat.id, "Вы не авторизованы. Введите кодовое слово")
+            bot.register_next_step_handler(msg, Bot.check_auth)
+            return False
+        return True
+
+    @staticmethod
     @bot.message_handler(commands=[SOLD_CMD])
     @bot.message_handler(func=lambda msg: msg.text == Type.sold.value)
     def sold(msg):
-        state = State.pik_today_sold
-        RequestProcessor.handle_request(msg, state)
+        if not Bot.check_user_authed_and_start_auth(msg):
+            return
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.SOLD_CMD):
+            state = State.pik_today_sold
+            RequestProcessor.handle_request(msg, state)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(commands=[FORECAST_CMD])
     @bot.message_handler(func=lambda msg: msg.text == Type.forecast.value)
     def forecast(msg):
-        state = State.pik_today_forecast
-        RequestProcessor.handle_request(msg, state)
+        if not Bot.check_user_authed_and_start_auth(msg):
+            return
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.FORECAST_CMD):
+            state = State.pik_today_forecast
+            RequestProcessor.handle_request(msg, state)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(commands=[SMS_CMD])
     @bot.message_handler(func=lambda msg: msg.text == Type.sms.value)
     def sms(msg):
-        state = State.pik_today_sms
-        RequestProcessor.handle_request(msg, state)
+        if not Bot.check_user_authed_and_start_auth(msg):
+            return
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.SMS_CMD):
+            state = State.pik_today_sms
+            RequestProcessor.handle_request(msg, state)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(func=lambda msg: msg.text == Source.all.value)
     def sms_all(msg):
-        state = State.all_today_sms
-        RequestProcessor.handle_request(msg, state)
+        if not Bot.check_user_authed_and_start_auth(msg):
+            return
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.SMS_CMD):
+            state = State.all_today_sms
+            RequestProcessor.handle_request(msg, state)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(func=lambda msg: msg.text == Source.pik.value)
     def sms_pik(msg):
-        if not session.is_user_in_sms_only_group(msg.chat.id, msg.from_user.id):
+        if not Bot.check_user_authed_and_start_auth(msg):
             return
-        state = State.pik_today_sms
-        RequestProcessor.handle_request(msg, state, next_step=False)
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.SMS_CMD):
+            state = State.pik_today_sms
+            RequestProcessor.handle_request(msg, state, next_step=False)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(func=lambda msg: msg.text == Source.morton.value)
     def sms_morton(msg):
-        if not session.is_user_in_sms_only_group(msg.chat.id, msg.from_user.id):
+        if not Bot.check_user_authed_and_start_auth(msg):
             return
-        state = State.morton_today_sms
-        RequestProcessor.handle_request(msg, state, next_step=False)
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.SMS_CMD):
+            state = State.morton_today_sms
+            RequestProcessor.handle_request(msg, state, next_step=False)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(commands=[PF_CMD])
     def pf_pik(msg):
-        state = State.pik_month_pf
-        RequestProcessor.handle_request(msg, state, next_step=False)
+        if not Bot.check_user_authed_and_start_auth(msg):
+            return
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.PF_CMD):
+            state = State.pik_month_pf
+            RequestProcessor.handle_request(msg, state, next_step=False)
+        else:
+            Bot.print_error_permission(msg)
+
+    @staticmethod
+    @bot.message_handler(commands=[BCAST_CMD])
+    def broadcast(msg):
+        if not Bot.check_user_authed_and_start_auth(msg):
+            return
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.BCAST_CMD):
+            txt = msg.text.split()
+            try:
+                group_name = txt[1]
+            except IndexError:
+                bot.send_message(msg.chat.id, "Не указано имя группы после команды", disable_notification=True)
+                return
+            text = " ".join(txt[2:])
+            session.add_bcast_msg(msg.chat.id, group_name, text)
+            markup = types.ReplyKeyboardMarkup(resize_keyboard=True, one_time_keyboard=True)
+            markup.row(types.KeyboardButton("Да"), types.KeyboardButton("Нет"))
+            bot.send_message(msg.chat.id, "Отправить сообщение группе {group_name} с текстом: \"{text}\"?".format(
+                group_name=group_name, text=text), reply_markup=markup, disable_notification=True)
+
+            session.set_current_state(msg.chat.id, msg.from_user.id, None)
+            bot.register_next_step_handler(msg, Bot.check_broadcast_msg)
+
+        else:
+            Bot.print_error_permission(msg)
+
+    @staticmethod
+    def check_broadcast_msg(msg):
+        session.set_current_state(msg.chat.id, msg.from_user.id, State.none)
+        user_choice = msg.text
+        if user_choice.lower() == "да":
+            bcast = session.pop_bcast_msg(msg.chat.id)
+            if not session.check_group_exist(bcast.group):
+                Bot.print_result_with_keyboard(msg, "Нет группы " + bcast.group)
+                return
+            Broadcaster.broadcast(bcast)
+            Bot.print_result_with_keyboard(msg, "Отправлено")
+        else:
+            Bot.print_result_with_keyboard(msg, "Отменено")
+
+    @staticmethod
+    @bot.message_handler(commands=[USER_LIST_CMD])
+    def user_list(msg):
+        if not Bot.check_user_authed_and_start_auth(msg):
+            return
+        user = session.get_user(msg.chat.id, msg.from_user.id)
+        if session.check_rights(user, Bot.USER_LIST_CMD):
+            users = session.get_users()
+            user_list = "id\tusername\tlast_name\tfirst_name\n"
+            for bot_user in users:
+                user_list += '\t'.join(
+                    [str(bot_user.id), str(bot_user.username), str(bot_user.last_name), bot_user.first_name]) + '\n'
+            bot.send_message(msg.chat.id, user_list)
+        else:
+            Bot.print_error_permission(msg)
 
     @staticmethod
     @bot.message_handler(func=lambda msg: session.get_current_state(msg.chat.id, msg.from_user.id) == State.none)
     def get_message(msg):
+        if not Bot.check_user_authed_and_start_auth(msg):
+            return
         if msg.text == "Назад":
             Bot.ok(msg)
             return
@@ -149,12 +260,11 @@ class Bot:
         user = session.get_user(msg.chat.id, msg.from_user.id)
         if next_step:
             Bot.print_step_keyboard(msg, text)
-        elif user.group == Group.full_info:
-            Bot.print_full_info_keyboard(msg, text)
-        elif user.group == Group.sms_only:
+        elif user.group == Group.users:
             Bot.print_sms_keyboard(msg, text)
         else:
-            Bot.hide_keyboard(msg, text)
+            Bot.print_sms_keyboard(msg, text)
+            # Bot.hide_keyboard(msg, text)
 
     @staticmethod
     def print_sms_keyboard(msg, text):
@@ -183,15 +293,14 @@ class Bot:
             return
         bot.send_message(msg.chat.id, text, reply_markup=markup, disable_notification=True)
 
+    @staticmethod
+    def print_error_permission(msg):
+        bot.send_message(msg.chat.id, "У вас недостаточно прав для данного запроса", disable_notification=True)
+
 
 class RequestProcessor:
     @staticmethod
     def handle_request(msg, state, next_step=True):
-        if not session.check_user_id_in_db(msg.from_user.id):
-            session.set_current_state(msg.chat.id, msg.from_user.id, State.auth)
-            bot.send_message(msg.chat.id, "Вы не авторизованы. Введите кодовое слово")
-            bot.register_next_step_handler(msg, Bot.check_auth)
-            return
 
         current_state = session.get_current_state(msg.chat.id, msg.from_user.id)
 
@@ -284,6 +393,14 @@ class KeyboardCreator:
         markup.row(types.KeyboardButton(Type.sold.value), types.KeyboardButton(Type.forecast.value),
                    types.KeyboardButton(Type.sms.value))
         return markup
+
+
+class Broadcaster:
+    @staticmethod
+    def broadcast(bcast):
+        users = session.get_users_for_group(bcast.group)
+        for user in users:
+            bot.send_message(user.id, bcast.text, disable_notification=True)
 
 
 server.start_bot()

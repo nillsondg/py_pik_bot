@@ -4,18 +4,10 @@ from states import Source
 from requests import get
 from requests_ntlm import HttpNtlmAuth
 
-URL_PATTERN = "http://tgbot01pik/PicGroupExcelReportService/GetExcelFile.ashx?token={token}&repName=pf.xlsx&" \
-              "Parameter 1={first_date_of_month}&Parameter 2={current_date}&Parameter 3={source}&Format=pdf"
+URL_PATTERN = "http://qgis01pik.main.picompany.ru/PicGroupExcelReportService/GetExcelFile.ashx?token={token}" \
+              "&repName=pf.xlsx&Parameter 1={first_date_of_month}&Parameter 2={current_date}" \
+              "&Parameter 3={source}&Format=pdf"
 FILE_FOLDER = "files_cache"
-
-
-def get_company_num(state):
-    if state.source == Source.pik:
-        return 0
-    elif state.source == Source.morton:
-        return 1
-    else:
-        raise RuntimeError("this source not supported")
 
 
 def get_company_name(state):
@@ -28,11 +20,9 @@ def get_company_name(state):
 
 
 def generate_url(state):
-    company_num = get_company_num(state)
-    current_date = date.today().strftime("%Y-%m-%d")
-    first_date_of_month = date(date.today().year, date.today().month, 1).strftime("%Y-%m-%d")
-    return URL_PATTERN.format(token=TOKEN, first_date_of_month=first_date_of_month, current_date=current_date,
-                              source=company_num)
+    current_date = date.today().strftime("%d.%m.%Y")
+    first_date_of_month = date(date.today().year, date.today().month, 1).strftime("%d.%m.%Y")
+    return URL_PATTERN.format(token=TOKEN, first_date_of_month=first_date_of_month, current_date=current_date, source=2)
 
 
 def generate_name(state):

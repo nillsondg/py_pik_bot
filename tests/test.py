@@ -10,7 +10,7 @@ class TestFiles(unittest.TestCase):
         state = State.pik_today_sold
         url = files.generate_url(state)
         print(url)
-        pattern = "http:\/\/tgbot01pik\/PicGroupExcelReportService/GetExcelFile\.ashx\?token=" + TOKEN + \
-                  "&repName=pf\.xlsx&Parameter 1=\d{4}-\d{2}-\d{2}&Parameter 2=\d{4}-\d{2}-\d{2}" \
-                  "&Parameter 3=[0,1]&Format=pdf"
+        pattern = "http:\/\/qgis01pik.main.picompany.ru\/PicGroupExcelReportService/GetExcelFile\.ashx\?token=" + TOKEN + \
+                  "&repName=pf\.xlsx&Parameter 1=\d{2}.\d{2}.\d{4}&Parameter 2=\d{2}.\d{2}.\d{4}" \
+                  "&Parameter 3=2&Format=pdf"
         self.assertRegex(url, pattern)

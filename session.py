@@ -1,14 +1,26 @@
 import mongodb
 import datetime
+import json
+from collections import OrderedDict
 from enum import Enum
 from states import State
 
 mongo = mongodb.MongoDB()
 
+with open('rights.json') as f:
+    rights = json.load(f, object_pairs_hook=OrderedDict)
+
 
 class Group(Enum):
-    sms_only = "sms_only"
-    full_info = "full_info"
+    users = "users"
+    admins = "admins"
+    owners = "owners"
+
+
+class Broadcast:
+    def __init__(self, group, text):
+        self.group = group
+        self.text = text
 
 
 class User:
@@ -40,6 +52,7 @@ class User:
 # todo name problem
 class Session:
     _users = dict()
+    _bcasts = dict()
 
     def get_user(self, uid, user_id):
         if uid not in self._users:
@@ -92,8 +105,38 @@ class Session:
     def check_user_id_in_db(self, user_id):
         return mongo.check_user_id_in_db(user_id)
 
-    def is_user_in_full_info_group(self, uid, user_id):
-        return self.get_user(uid, user_id).group == Group.full_info
+    def is_user_in_admins_group(self, uid, user_id):
+        return self.get_user(uid, user_id).group == Group.admins
 
-    def is_user_in_sms_only_group(self, uid, user_id):
-        return self.get_user(uid, user_id).group == Group.sms_only
+    def is_user_in_users_group(self, uid, user_id):
+        return self.get_user(uid, user_id).group == Group.users
+
+    def get_users_for_group(self, group_name):
+        return self.convert_mongo_users(mongo.get_user_for_group_from_db(group_name))
+
+    def get_users(self):
+        return self.convert_mongo_users(mongo.get_users())
+
+    def convert_mongo_users(self, mongo_users):
+        users = []
+        for mongo_user in mongo_users:
+            users.append(User.create_user_from_mongo(mongo_user))
+        return users
+
+    def check_group_exist(self, group_name):
+        return group_name in [e.value for e in Group]
+
+    def add_bcast_msg(self, uid, group_name, text):
+        self._bcasts[uid] = Broadcast(group_name, text)
+
+    def pop_bcast_msg(self, uid):
+        return self._bcasts.pop(uid)
+
+    def check_rights(self, user, cmd):
+        # if user.group
+        cmd_list = Session._get_cmd_list(user.group)
+        return cmd in cmd_list
+
+    @staticmethod
+    def _get_cmd_list(user_group):
+        return rights[user_group.value]
