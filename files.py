@@ -27,7 +27,6 @@ def generate_url(state):
 
 def generate_name(state):
     today = date.today()
-    "pf01.2017"
     name_pattern = "pf{date}.pdf"
     return FILE_FOLDER + "/" + name_pattern.format(date=today.strftime("%m.%Y"))
 
